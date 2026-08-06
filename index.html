@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>上岸通 · 考公刷题</title>
+  <meta name="theme-color" content="#5b6cff" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/mock-exam.css" />
+  <link rel="stylesheet" href="css/features.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%235b6cff'/%3E%3Ctext x='50%25' y='55%25' font-size='40' text-anchor='middle' fill='white' font-family='system-ui'%3E上%3C/text%3E%3C/svg%3E" />
+</head>
+<body>
+  <!-- 真题库异步加载遮罩：首屏立即显示，银行分卷载入期间可见且可响应，加载完成后淡出 -->
+  <div id="bankLoading" class="bank-loading">
+    <div class="bl-card">
+      <div class="bl-logo">上岸通</div>
+      <div class="bl-title">真题库加载中…</div>
+      <div class="bl-bar"><div class="bl-bar-fill" id="blFill"></div></div>
+      <div class="bl-row"><span class="bl-pct" id="blPct">0%</span><span class="bl-sub" id="blSub">正在准备真题分卷</span></div>
+    </div>
+  </div>
+
+  <div class="app">
+    <!-- 顶部导航 -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo">上</div>
+        <div class="brand-text">
+          <div class="brand-name">上岸通</div>
+          <div class="brand-sub">公考刷题 · 每日一练</div>
+        </div>
+      </div>
+      <div class="top-right">
+        <a class="ghost-btn" href="#search" title="搜题">🔎 搜题</a>
+        <button class="ghost-btn" id="streakBtn" title="连续打卡">
+          <span class="streak-icon">🔥</span><span id="streakDays">0</span>天
+        </button>
+      </div>
+    </header>
+
+    <!-- 主页 -->
+    <main class="page" id="page-home">
+      <section class="hero card">
+        <div class="hero-left">
+          <div class="hero-title">距离国考 <span class="hl">还剩</span></div>
+          <div class="countdown" id="countdown">--天 --:--:--</div>
+          <div class="hero-sub" id="todayQuote">今日一思：把每一道错题当作必考点。</div>
+        </div>
+        <div class="hero-right">
+          <div class="ring" id="ringProgress">
+            <svg viewBox="0 0 80 80">
+              <circle cx="40" cy="40" r="34" class="ring-bg" />
+              <circle cx="40" cy="40" r="34" class="ring-fg" id="ringFg" />
+            </svg>
+            <div class="ring-text">
+              <div class="ring-num" id="todayCount">0</div>
+              <div class="ring-cap">今日已刷</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 私人教练横幅（核心入口） -->
+      <a class="coach-banner card" href="#coach">
+        <div class="cb-left">
+          <div class="cb-title">🤖 我的私人行测教练</div>
+          <div class="cb-sub" id="coachBannerSub">把每次作答都变成"下一步练什么"的决策</div>
+        </div>
+        <div class="cb-go">进入 ›</div>
+      </a>
+
+      <!-- 真题套卷库（醒目入口） -->
+      <a class="papers-banner card" href="#papers">
+        <div class="pb-left">
+          <div class="pb-icon">📚</div>
+          <div class="pb-text">
+            <div class="pb-title">真题套卷库</div>
+            <div class="pb-sub" id="papersBannerSub">国考 88 套 · 省考 723 套 · 一套一套刷</div>
+          </div>
+        </div>
+        <div class="pb-go">进入 ›</div>
+      </a>
+
+      <!-- 行测分板块总览（一键查看所有子考点） -->
+      <a class="modules-banner card" href="#modules">
+        <div class="mbn-left">
+          <div class="mbn-icon">📊</div>
+          <div class="mbn-text">
+            <div class="mbn-title">行测分板块总览</div>
+            <div class="mbn-sub">一键查看所有子考点 · 题量 / 正确率 / 直达刷题</div>
+          </div>
+        </div>
+        <div class="mbn-go">查看 →</div>
+      </a>
+
+      <section class="quick-actions">
+        <a class="qa qa-primary" href="#practice">
+          <div class="qa-icon">🚀</div>
+          <div class="qa-title">立即刷题</div>
+          <div class="qa-sub">分模块专项练习</div>
+        </a>
+        <a class="qa qa-warning" href="#exam">
+          <div class="qa-icon">📝</div>
+          <div class="qa-title">真题模考</div>
+          <div class="qa-sub">限时 120 分钟</div>
+        </a>
+        <a class="qa qa-success" href="#mistakes">
+          <div class="qa-icon">📒</div>
+          <div class="qa-title">错题本</div>
+          <div class="qa-sub" id="mistakeCount">0 道</div>
+        </a>
+        <a class="qa qa-info" href="#favorites">
+          <div class="qa-icon">⭐</div>
+          <div class="qa-title">收藏</div>
+          <div class="qa-sub" id="favCount">0 道</div>
+        </a>
+      </section>
+
+      <a class="search-entry card" href="#search">
+        <span class="se-ic">🔎</span>
+        <span class="se-txt">搜题 · 输入任意词，题干/选项/材料/解析全库匹配</span>
+        <span class="se-go">›</span>
+      </a>
+
+      <section class="quick-actions">
+        <a class="qa qa-method" href="#method">
+          <div class="qa-icon">📚</div>
+          <div class="qa-title">方法库</div>
+          <div class="qa-sub">通法 + 命题陷阱</div>
+        </a>
+        <a class="qa qa-speed" href="#speed">
+          <div class="qa-icon">⚡</div>
+          <div class="qa-title">速算练习</div>
+          <div class="qa-sub">资料分析专练</div>
+        </a>
+        <a class="qa qa-freq" href="#freq">
+          <div class="qa-icon">📊</div>
+          <div class="qa-title">考频热力</div>
+          <div class="qa-sub">抓高频考点</div>
+        </a>
+        <a class="qa qa-structure" href="#paper-structure">
+          <div class="qa-icon">🗂️</div>
+          <div class="qa-title">卷型结构</div>
+          <div class="qa-sub">三类卷·题型配比</div>
+        </a>
+      </section>
+
+      <section class="quick-actions">
+        <a class="qa qa-tips" href="#tips">
+          <div class="qa-icon">💡</div>
+          <div class="qa-title">速算·技巧库</div>
+          <div class="qa-sub">资料速算/实战通法</div>
+        </a>
+        <a class="qa qa-dash" href="#dashboard">
+          <div class="qa-icon">🎯</div>
+          <div class="qa-title">目标差距看板</div>
+          <div class="qa-sub">距 85 分还差多少</div>
+        </a>
+      </section>
+
+      <!-- 常识分板块直达（政治理论为公考常识第一大板块） -->
+      <section class="card sub-entry">
+        <div class="card-head">
+          <div class="card-title">常识分板块专项</div>
+          <div class="card-sub">按考点直接开刷</div>
+        </div>
+        <div class="sub-grid">
+          <a class="sub-chip sub-hot" href="#practice&module=zhengzhi">🏛️ 政治理论<i>242</i></a>
+          <a class="sub-chip" href="#practice&module=zhengzhi&topic=cs-zz-mzt">毛中特·习思想<i>99</i></a>
+          <a class="sub-chip" href="#practice&module=zhengzhi&topic=cs-zz-mky">马原·哲学<i>24</i></a>
+          <a class="sub-chip" href="#practice&module=zhengzhi&topic=cs-zz-ds">党史党建<i>35</i></a>
+          <a class="sub-chip" href="#practice&module=zhengzhi&topic=cs-zz-sz">时政方针<i>84</i></a>
+          <a class="sub-chip" href="#practice&module=changshi&topic=cs-fl">法律法规<i>123</i></a>
+          <a class="sub-chip" href="#practice&module=changshi&topic=cs-jj">经济常识<i>59</i></a>
+          <a class="sub-chip" href="#practice&module=changshi&topic=cs-rw">人文历史<i>213</i></a>
+          <a class="sub-chip" href="#practice&module=changshi&topic=cs-kj">科技常识<i>196</i></a>
+          <a class="sub-chip" href="#practice&module=changshi&topic=cs-dl">地理国情<i>75</i></a>
+          <a class="sub-chip" href="#practice&module=changshi&topic=cs-sh">生活百科<i>41</i></a>
+        </div>
+      </section>
+
+      <!-- 判断推理分板块直达（行测第一大题，按考点最高频题型开刷） -->
+      <section class="card sub-entry">
+        <div class="card-head">
+          <div class="card-title">判断推理分板块专项</div>
+          <div class="card-sub">按考点直接开刷</div>
+        </div>
+        <div class="sub-grid">
+          <a class="sub-chip sub-hot" href="#practice&module=panduan&keypoint=数量规律-素,数量规律-线,数量规律-面,位置规律-平移,属性规律-对称性,空间类-空间重构-六面体">✏️ 图形推理<i>2632</i></a>
+          <a class="sub-chip sub-hot" href="#practice&module=panduan&keypoint=逻辑关系-对应关系,逻辑关系-包容关系,逻辑关系-并列关系,语义关系-近义关系,语法关系,主客体,拆词">🔀 类比推理<i>5986</i></a>
+          <a class="sub-chip" href="#practice&module=panduan&keypoint=削弱论点,加强论证,搭桥,翻译推理,原因结果,方式目的,补充论据,必要条件,日常结论">🧠 逻辑判断<i>5708</i></a>
+          <a class="sub-chip" href="#practice&module=panduan&keypoint=单定义-其他句式">📖 定义判断<i>1341</i></a>
+        </div>
+      </section>
+
+      <!-- 资料分析分板块直达（最值得刷出速算技巧的模块） -->
+      <section class="card sub-entry">
+        <div class="card-head">
+          <div class="card-title">资料分析分板块专项</div>
+          <div class="card-sub">按考点直接开刷</div>
+        </div>
+        <div class="sub-grid">
+          <a class="sub-chip sub-hot" href="#practice&module=ziliao&keypoint=综合资料,文字资料,统计表,统计图">📄 资料类型<i>11614</i></a>
+          <a class="sub-chip" href="#practice&module=ziliao&keypoint=直接找数,简单加减计算,现期比重,现期平均数,现期倍数,现期计算,排序类">🔢 现期类<i>4289</i></a>
+          <a class="sub-chip" href="#practice&module=ziliao&keypoint=一般增长率,混合增长率,增长量计算,增长量比较,比值计算">📈 增长率<i>2172</i></a>
+          <a class="sub-chip" href="#practice&module=ziliao&keypoint=基期计算,基期比重,基期比较,基期和差">⏪ 基期类<i>1122</i></a>
+        </div>
+      </section>
+
+      <!-- 言语理解分板块直达（题量最大、提分最快的模块） -->
+      <section class="card sub-entry">
+        <div class="card-head">
+          <div class="card-title">言语理解分板块专项</div>
+          <div class="card-sub">按考点直接开刷</div>
+        </div>
+        <div class="sub-grid">
+          <a class="sub-chip sub-hot" href="#practice&module=yanyu&keypoint=实词填空,成语填空,混搭填空,词的辨析-搭配对象,词的辨析-词义侧重,词的辨析-程度轻重,词的辨析-感情色彩">📝 逻辑填空<i>15889</i></a>
+          <a class="sub-chip" href="#practice&module=yanyu&keypoint=细节判断题,标题填入题,接语选择题,普通篇章,横线在中间,横线在结尾">📖 片段阅读<i>6025</i></a>
+          <a class="sub-chip" href="#practice&module=yanyu&keypoint=关联词-转折,关联词-因果,关联词-并列,关联词-对策">🔗 关联词<i>3964</i></a>
+          <a class="sub-chip" href="#practice&module=yanyu&keypoint=确定顺序,确定捆绑,分述句特征-引入铺垫,主题词">🧩 语句表达<i>3017</i></a>
+        </div>
+      </section>
+
+      <!-- 数量关系分板块直达（多数人放弃，其实有套路的模块） -->
+      <section class="card sub-entry">
+        <div class="card-head">
+          <div class="card-title">数量关系分板块专项</div>
+          <div class="card-sub">按考点直接开刷</div>
+        </div>
+        <div class="sub-grid">
+          <a class="sub-chip sub-hot" href="#practice&module=shuliang&keypoint=和差倍比问题,基础排列组合,给情况求概率,给效率比例型,给完工时间型,给具体单位型,经济利润问题">➕ 基础题型<i>3387</i></a>
+          <a class="sub-chip" href="#practice&module=shuliang&keypoint=几何公式类-平面图形,几何公式类-立体图形,几何结论类-三角形相关,几何结论类-相似图形,几何结论类-几何小题型">📐 几何问题<i>1859</i></a>
+          <a class="sub-chip" href="#practice&module=shuliang&keypoint=数列问题,多级数列,递推数列,构造数列,统筹规划问题,非典型最值问题">🔢 数列与统筹<i>1493</i></a>
+          <a class="sub-chip" href="#practice&module=shuliang&keypoint=普通行程,相遇追及,年龄问题">🛤️ 行程问题<i>769</i></a>
+          <a class="sub-chip" href="#practice&module=shuliang&keypoint=普通不定方程,给概率求概率,机械划分">❓ 方程与概率<i>367</i></a>
+        </div>
+      </section>
+
+      <section class="quick-actions">
+        <a class="qa qa-diag" href="#diagnosis">
+          <div class="qa-icon">🩺</div>
+          <div class="qa-title">诊断中心</div>
+          <div class="qa-sub">错因 / 薄弱点</div>
+        </a>
+        <a class="qa qa-train" href="#training">
+          <div class="qa-icon">🎯</div>
+          <div class="qa-title">智能训练</div>
+          <div class="qa-sub">针对性刷题</div>
+        </a>
+        <a class="qa qa-tact" href="#tactics">
+          <div class="qa-icon">♟️</div>
+          <div class="qa-title">战术复盘</div>
+          <div class="qa-sub">时间 / 蒙题策略</div>
+        </a>
+        <a class="qa qa-exp" href="#experience">
+          <div class="qa-icon">🌟</div>
+          <div class="qa-title">学习体验</div>
+          <div class="qa-sub">打卡 / 番茄钟</div>
+        </a>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <div class="card-title">行测六大模块</div>
+          <div class="card-extra">共 <span id="totalQuestions">0</span> 题已入库</div>
+        </div>
+        <div class="modules">
+          <a class="module m-zhengzhi" href="#practice&module=zhengzhi">
+            <div class="m-icon">🏛️</div>
+            <div class="m-info">
+              <div class="m-name">政治理论</div>
+              <div class="m-desc">2025 国考起独立成模块 · 20 题</div>
+            </div>
+            <div class="m-stat"><span id="s-zhengzhi">0</span></div>
+          </a>
+          <a class="module m-changshi" href="#practice&module=changshi">
+            <div class="m-icon">🌐</div>
+            <div class="m-info">
+              <div class="m-name">常识判断</div>
+              <div class="m-desc">政治/法律/经济/人文/科技</div>
+            </div>
+            <div class="m-stat"><span id="s-changshi">0</span></div>
+          </a>
+          <a class="module m-yanyu" href="#practice&module=yanyu">
+            <div class="m-icon">📖</div>
+            <div class="m-info">
+              <div class="m-name">言语理解</div>
+              <div class="m-desc">逻辑填空/片段阅读/语句表达</div>
+            </div>
+            <div class="m-stat"><span id="s-yanyu">0</span></div>
+          </a>
+          <a class="module m-shuliang" href="#practice&module=shuliang">
+            <div class="m-icon">🧮</div>
+            <div class="m-info">
+              <div class="m-name">数量关系</div>
+              <div class="m-desc">数学运算/数字推理</div>
+            </div>
+            <div class="m-stat"><span id="s-shuliang">0</span></div>
+          </a>
+          <a class="module m-panduan" href="#practice&module=panduan">
+            <div class="m-icon">🧩</div>
+            <div class="m-info">
+              <div class="m-name">判断推理</div>
+              <div class="m-desc">图形/定义/类比/逻辑</div>
+            </div>
+            <div class="m-stat"><span id="s-panduan">0</span></div>
+          </a>
+          <a class="module m-ziliao" href="#practice&module=ziliao">
+            <div class="m-icon">📊</div>
+            <div class="m-info">
+              <div class="m-name">资料分析</div>
+              <div class="m-desc">文字/图表/综合资料</div>
+            </div>
+            <div class="m-stat"><span id="s-ziliao">0</span></div>
+          </a>
+          <a class="module m-shenlun" href="#practice&module=shenlun">
+            <div class="m-icon">🖊️</div>
+            <div class="m-info">
+              <div class="m-name">申论</div>
+              <div class="m-desc">概括/对策/作文/应用文</div>
+            </div>
+            <div class="m-stat"><span id="s-shenlun">0</span></div>
+          </a>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <div class="card-title">最近 7 天</div>
+          <a class="card-extra link" href="#stats">详细统计 →</a>
+        </div>
+        <div class="chart" id="weekChart"></div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <div class="card-title">考公日历</div>
+          <div class="card-extra">重要时间节点</div>
+        </div>
+        <div class="cal-list">
+          <div class="cal-row"><span class="cal-tag">预计</span><span class="cal-date">2026 年国考报名</span><span class="cal-label">10 月中</span></div>
+          <div class="cal-row"><span class="cal-tag warn">笔试</span><span class="cal-date">2026 年国考公共科目</span><span class="cal-label">11 月底 / 12 月初</span></div>
+          <div class="cal-row"><span class="cal-tag">面试</span><span class="cal-date">2027 年国考面试</span><span class="cal-label">次年 3–5 月</span></div>
+          <div class="cal-row"><span class="cal-tag">联考</span><span class="cal-date">多省公务员联考</span><span class="cal-label">3–4 月</span></div>
+        </div>
+      </section>
+
+      <footer class="foot">上岸通 · 本地刷题版 · 数据保存在你的浏览器里</footer>
+    </main>
+
+    <!-- 刷题页 -->
+    <main class="page hidden" id="page-practice">
+      <div class="page-head">
+        <button class="back" data-back="home">←</button>
+        <div class="ph-title">刷题练习</div>
+        <div class="ph-right">
+          <button class="btn-ghost small" id="toggleFilter" title="筛选">🔍 筛选</button>
+          <button class="btn-ghost small" id="toggleCustom" title="自定义刷题">⚙ 自定义</button>
+        </div>
+      </div>
+
+      <!-- 筛选面板 -->
+      <div class="filter-panel hidden" id="filterPanel">
+        <div class="fp-row">
+          <span class="fp-label">模块</span>
+          <div class="fp-tags" id="fpModules"></div>
+        </div>
+        <div class="fp-row">
+          <span class="fp-label">关键词</span>
+          <input id="fpKw" class="input" placeholder="按题干 / 选项 / 考点关键词搜索…" style="flex:1;max-width:320px" />
+        </div>
+        <div class="fp-row">
+          <span class="fp-label">考点</span>
+          <div class="fp-tags" id="fpTopics"></div>
+        </div>
+        <div class="fp-row">
+          <span class="fp-label">年份</span>
+          <div class="fp-tags" id="fpYears"></div>
+          <button class="btn-ghost small" id="fpYearCustom">区间</button>
+        </div>
+        <div class="fp-row">
+          <span class="fp-label">考试</span>
+          <div class="fp-tags" id="fpExams"></div>
+        </div>
+        <div class="fp-row">
+          <span class="fp-label">卷型</span>
+          <div class="fp-tags" id="fpVolume"></div>
+        </div>
+        <div class="fp-row">
+          <span class="fp-label">套卷</span>
+          <select id="fpPaper" class="select" style="flex:1;max-width:300px">
+            <option value="">— 不限定套卷 —</option>
+          </select>
+        </div>
+        <div class="fp-row">
+          <span class="fp-label">场景</span>
+          <div class="fp-tags" id="fpPresets">
+            <span class="fp-tag preset" data-preset="gk-jqxr-5">近5年·国考·加强削弱</span>
+            <span class="fp-tag preset" data-preset="gk-dishi-2016">2016国考地市卷</span>
+            <span class="fp-tag preset" data-preset="gk-txtl-5">近5年·国考·图形推理</span>
+            <span class="fp-tag preset" data-preset="hlj-plzh-5">黑龙江近5年·数量·排列组合</span>
+            <span class="fp-tag preset" data-preset="gk-yjpx-10">近10年·国考·语句排序</span>
+          </div>
+        </div>
+        <div class="fp-row">
+          <span class="fp-label">时间</span>
+          <div class="fp-tags" id="fpYearRange">
+            <span class="fp-tag" data-range="5">近5年</span>
+            <span class="fp-tag" data-range="10">近10年</span>
+            <span class="fp-tag" data-range="20">近20年</span>
+          </div>
+        </div>
+        <div class="fp-row">
+          <span class="fp-label">来源</span>
+          <div class="fp-tags" id="fpSource">
+            <span class="fp-tag" data-src="all">全部</span>
+            <span class="fp-tag" data-src="real">真题回忆版</span>
+            <span class="fp-tag" data-src="sim">高仿真练习</span>
+          </div>
+        </div>
+        <div class="fp-row">
+          <span class="fp-label">难度</span>
+          <div class="fp-tags" id="fpDifficulty"></div>
+        </div>
+        <div class="fp-actions">
+          <span class="fp-result" id="fpResult">共 0 题</span>
+          <button class="btn-primary small" id="fpApply">应用筛选</button>
+          <button class="btn-ghost small" id="fpClear">清除</button>
+        </div>
+      </div>
+
+      <!-- 自定义刷题面板（参考粉笔） -->
+      <div class="custom-panel hidden" id="customPanel">
+        <h3 class="cp-title">自定义刷题</h3>
+        <p class="cp-sub">上次未完成题组不受此设置影响</p>
+
+        <div class="cp-row">
+          <span class="cp-label">设置做题模式</span>
+          <div class="cp-mode-group">
+            <button class="cp-mode active" data-mode="practice">做题模式</button>
+            <button class="cp-mode" data-mode="review">背题模式</button>
+          </div>
+        </div>
+
+        <div class="cp-row">
+          <span class="cp-label">设置出题年份 <span class="cp-hint" title="只推送所选年份范围内的真题">?</span></span>
+          <div class="cp-year-group">
+            <button class="cp-year active" data-years="0">不限</button>
+            <button class="cp-year" data-years="3">近3年</button>
+            <button class="cp-year" data-years="5">近5年</button>
+            <button class="cp-year" data-years="10">近10年</button>
+          </div>
+        </div>
+
+        <div class="cp-row">
+          <span class="cp-label">设置每组出题数量</span>
+          <div class="cp-count-group">
+            <button class="cp-count" data-count="5">5</button>
+            <button class="cp-count" data-count="10">10</button>
+            <button class="cp-count active" data-count="15">15</button>
+            <button class="cp-count" data-count="20">20</button>
+            <button class="cp-count" data-count="25">25</button>
+            <button class="cp-count" data-count="30">30</button>
+            <button class="cp-count" data-count="35">35</button>
+            <button class="cp-count" data-count="40">40</button>
+          </div>
+        </div>
+
+        <div class="cp-actions">
+          <button class="btn-ghost" id="cpCancel">取消</button>
+          <button class="btn-primary" id="cpSave">保存</button>
+        </div>
+      </div>
+
+      <div class="progress">
+        <div class="progress-bar"><div class="progress-fill" id="pBar"></div></div>
+        <div class="progress-meta"><span id="pIndex">--</span> / <span id="pTotal">--</span></div>
+      </div>
+
+      <div class="card question-card" id="qCard">
+        <div class="q-type" id="qType">— · —</div>
+        <span class="q-timer" id="qTimer">00:00</span>
+        <div class="q-src" id="qSrc"></div>
+        <div class="q-stem" id="qStem">加载中...</div>
+        <div id="qMaterial" class="q-material"></div>
+        <div class="q-options" id="qOptions"></div>
+        <div class="q-answer hidden" id="qAnswer">
+          <div class="ans-row">
+            <span class="ans-label">正确答案</span>
+            <span class="ans-value" id="ansValue">—</span>
+            <span class="ans-tag correct" id="ansTag">已答对</span>
+          </div>
+          <div class="ans-explain" id="ansExplain"></div>
+        </div>
+      </div>
+
+      <div class="quiz-actions">
+        <button class="btn-ghost" id="prevBtn">上一题</button>
+        <button class="btn-ghost warn" id="favBtn">⭐ 收藏</button>
+        <button class="btn-ghost" id="guessBtn">🎲 蒙一下</button>
+        <button class="btn-primary" id="checkBtn">查看答案</button>
+        <button class="btn-primary next" id="nextBtn">下一题 →</button>
+      </div>
+    </main>
+
+    <!-- 模考页 -->
+    <main class="page hidden" id="page-exam">
+      <div class="page-head">
+        <button class="back" data-back="home">←</button>
+        <div class="ph-title">真题模考</div>
+        <div class="ph-right"><span class="timer" id="examTimer">02:00:00</span></div>
+      </div>
+
+      <div id="examIntro" class="card">
+        <h3 class="exam-title" id="examTitle">真题套卷模考</h3>
+        <div class="exam-sub" id="examSub">选择一套真实行测真题卷，限时实战</div>
+        <div class="exam-picker">
+          <div class="ep-bar">
+            <select id="epCat" class="select">
+              <option value="gk">国考</option>
+              <option value="sheng">省考</option>
+              <option value="all">全部</option>
+            </select>
+            <select id="epYear" class="select"><option value="">全部年份</option></select>
+          </div>
+          <div class="ep-list" id="epList"></div>
+        </div>
+        <div class="exam-rules">
+          <div>• 单题作答后可勾选标记</div>
+          <div>• 交卷后查看成绩与逐题解析</div>
+          <div>• 答题记录自动保存到本地</div>
+        </div>
+        <button class="btn-primary big" id="startExam" disabled>请选择一套真题卷</button>
+      </div>
+
+      <div id="examBody" class="hidden">
+        <div class="progress">
+          <div class="progress-bar"><div class="progress-fill" id="eBar"></div></div>
+          <div class="progress-meta"><span id="eIndex">--</span> / <span id="eTotal">--</span></div>
+        </div>
+        <div class="card question-card">
+          <div class="q-type" id="eType">— · —</div>
+          <div class="q-stem" id="eStem">—</div>
+          <div class="q-options" id="eOptions"></div>
+        </div>
+        <div class="exam-grid" id="eGrid"></div>
+        <div class="quiz-actions">
+          <button class="btn-ghost" id="ePrev">上一题</button>
+          <button class="btn-ghost warn" id="eMark">🚩 标记</button>
+          <button class="btn-ghost" id="examGuessBtn">🎲 蒙一下</button>
+          <button class="btn-primary" id="eNext">下一题</button>
+          <button class="btn-primary danger" id="eSubmit">交卷</button>
+        </div>
+      </div>
+
+      <div id="examResult" class="card hidden">
+        <h3 class="exam-title">模考成绩</h3>
+        <div class="score-num" id="scoreNum">0</div>
+        <div class="score-sub"><span id="scoreCorrect">0</span> 正确 / <span id="scoreTotal">30</span> 题</div>
+        <div class="score-grid">
+          <div><div class="sg-num" id="sgRight">0</div><div class="sg-cap">正确</div></div>
+          <div><div class="sg-num" id="sgWrong">0</div><div class="sg-cap">错误</div></div>
+          <div><div class="sg-num" id="sgSkip">0</div><div class="sg-cap">未答</div></div>
+          <div><div class="sg-num" id="sgAcc">0%</div><div class="sg-cap">正确率</div></div>
+        </div>
+        <div class="exam-mod-breakdown" id="examModBreak"></div>
+        <div class="quiz-actions">
+          <button class="btn-primary" id="reviewBtn">逐题回顾</button>
+          <button class="btn-ghost" id="againBtn">再来一次</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- 错题本 -->
+    <main class="page hidden" id="page-mistakes">
+      <div class="page-head">
+        <button class="back" data-back="home">←</button>
+        <div class="ph-title">错题本</div>
+        <div class="ph-right"><button class="btn-ghost small danger" id="clearMistakes">清空</button></div>
+      </div>
+      <div class="empty card" id="emptyMistakes">还没有错题，刷完一组开始收获 ✨</div>
+      <div id="mistakeList"></div>
+    </main>
+
+    <!-- 收藏 -->
+    <main class="page hidden" id="page-favorites">
+      <div class="page-head">
+        <button class="back" data-back="home">←</button>
+        <div class="ph-title">收藏夹</div>
+        <div class="ph-right"><button class="btn-ghost small danger" id="clearFav">清空</button></div>
+      </div>
+      <div class="empty card" id="emptyFav">还没有收藏题，看到好题记得 ⭐ 一下</div>
+      <div id="favList"></div>
+    </main>
+
+    <!-- 统计 -->
+    <main class="page hidden" id="page-stats">
+      <div class="page-head">
+        <button class="back" data-back="home">←</button>
+        <div class="ph-title">学习统计</div>
+        <div class="ph-right"></div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="sc-num" id="stTotal">0</div><div class="sc-cap">累计刷题</div></div>
+        <div class="stat-card"><div class="sc-num" id="stCorrect">0</div><div class="sc-cap">累计正确</div></div>
+        <div class="stat-card"><div class="sc-num" id="stAcc">0%</div><div class="sc-cap">总体正确率</div></div>
+        <div class="stat-card"><div class="sc-num" id="stToday">0</div><div class="sc-cap">今日刷题</div></div>
+        <div class="stat-card"><div class="sc-num" id="stWeek">0</div><div class="sc-cap">本周刷题</div></div>
+        <div class="stat-card"><div class="sc-num" id="stDays">0</div><div class="sc-cap">连续打卡</div></div>
+      </div>
+      <section class="card">
+        <div class="card-head"><div class="card-title">模块正确率</div></div>
+        <div class="module-acc" id="moduleAcc"></div>
+      </section>
+      <section class="card">
+        <div class="card-head"><div class="card-title">题库覆盖</div><div class="card-extra" id="covSummary"></div></div>
+        <div id="covBody"></div>
+      </section>
+      <section class="card">
+        <div class="card-head"><div class="card-title">每日刷题</div></div>
+        <div class="chart" id="dayChart"></div>
+      </section>
+      <section class="card">
+        <div class="card-head"><div class="card-title">数据备份</div><div class="card-extra">防丢 · 可存 D 盘</div></div>
+        <div class="backup-actions">
+          <button class="btn-primary small" id="backupBtn">⬇️ 一键备份</button>
+          <button class="btn-ghost small" id="importBtn">⬆️ 导入备份</button>
+          <input type="file" id="importFile" accept="application/json" style="display:none" />
+        </div>
+      </section>
+    </main>
+
+    <!-- 方法库 -->
+    <main class="page hidden" id="page-method">
+      <div class="page-head">
+        <button class="back" data-back="home">←</button>
+        <div class="ph-title">方法库 · 通法 + 命题陷阱</div>
+        <div class="ph-right"></div>
+      </div>
+      <div id="methodRoot"></div>
+    </main>
+
+    <!-- 速算练习 -->
+    <main class="page hidden" id="page-speed">
+      <div class="page-head">
+        <button class="back" data-back="home">←</button>
+        <div class="ph-title">速算练习 · 资料分析</div>
+        <div class="ph-right"></div>
+      </div>
+      <div id="speedRoot"></div>
+    </main>
+
+    <!-- 考频热力 -->
+    <main class="page hidden" id="page-freq">
+      <div class="page-head">
+        <button class="back" data-back="home">←</button>
+        <div class="ph-title">考频热力图</div>
+        <div class="ph-right"></div>
+      </div>
+      <div id="freqRoot"></div>
+    </main>
+
+    <!-- 诊断中心 -->
+    <main class="page hidden" id="page-diagnosis">
+      <div class="page-head">
+        <button class="back" data-back="home">←</button>
+        <div class="ph-title">诊断中心</div>
+        <div class="ph-right"></div>
+      </div>
+      <div id="diagnosisRoot"></div>
+    </main>
+
+    <!-- 智能训练 -->
+    <main class="page hidden" id="page-training">
+      <div class="page-head">
+        <button class="back" data-back="home">←</button>
+        <div class="ph-title">智能训练闭环</div>
+        <div class="ph-right"></div>
+      </div>
+      <div id="trainingRoot"></div>
+    </main>
+
+    <!-- 战术复盘 -->
+    <main class="page hidden" id="page-tactics">
+      <div class="page-head">
+        <button class="back" data-back="home">←</button>
+        <div class="ph-title">战术复盘</div>
+        <div class="ph-right"></div>
+      </div>
+      <div id="tacticsRoot"></div>
+    </main>
+
+    <!-- 学习体验 -->
+    <main class="page hidden" id="page-experience">
+      <div class="page-head">
+        <button class="back" data-back="home">←</button>
+        <div class="ph-title">学习体验</div>
+        <div class="ph-right"></div>
+      </div>
+      <div id="experienceRoot"></div>
+    </main>
+
+    <!-- 搜题 -->
+    <main class="page hidden" id="page-search">
+      <div class="page-head">
+        <button class="back" data-back="home">←</button>
+        <div class="ph-title">搜题</div>
+        <div class="ph-right"></div>
+      </div>
+      <div id="searchRoot"></div>
+    </main>
+
+    <!-- 卷型结构 -->
+    <main class="page hidden" id="page-paper-structure">
+      <div class="page-head">
+        <button class="back" data-back="home">←</button>
+        <div class="ph-title">卷型结构</div>
+        <div class="ph-right"></div>
+      </div>
+      <section class="card" id="paperStructureRoot">加载中…</section>
+    </main>
+
+    <!-- 速算/技巧库 -->
+    <main class="page hidden" id="page-tips">
+      <div class="page-head">
+        <button class="back" data-back="home">←</button>
+        <div class="ph-title">速算 · 实战技巧库</div>
+        <div class="ph-right"></div>
+      </div>
+      <div id="tipsRoot"></div>
+    </main>
+
+    <!-- 目标差距看板 -->
+    <main class="page hidden" id="page-dashboard">
+      <div class="page-head">
+        <button class="back" data-back="home">←</button>
+        <div class="ph-title">目标差距看板 · 行测 85</div>
+        <div class="ph-right"></div>
+      </div>
+      <div id="dashboardRoot"></div>
+    </main>
+
+    <!-- 私人教练 -->
+    <main class="page hidden" id="page-coach">
+      <div class="page-head">
+        <button class="back" data-back="home">←</button>
+        <div class="ph-title">私人行测教练</div>
+        <div class="ph-right"></div>
+      </div>
+      <div id="coachRoot"></div>
+    </main>
+
+    <!-- 行测分板块总览 -->
+    <main class="page hidden" id="page-modules">
+      <div class="page-head">
+        <button class="back" data-back="home">←</button>
+        <div class="ph-title">行测分板块总览</div>
+        <div class="ph-right"></div>
+      </div>
+      <div id="modulesRoot"></div>
+    </main>
+
+    <!-- 真题套卷库 -->
+    <main class="page hidden" id="page-papers">
+      <div class="page-head">
+        <button class="back" data-back="home">←</button>
+        <div class="ph-title">真题套卷库</div>
+        <div class="ph-right"></div>
+      </div>
+
+      <!-- 列表模式 -->
+      <div id="papersList">
+        <div class="pp-filters card">
+          <div class="fp-row">
+            <span class="fp-label">类别</span>
+            <div class="fp-tags" id="ppCat">
+              <span class="fp-tag active" data-cat="gk">国考</span>
+              <span class="fp-tag" data-cat="sheng">省考</span>
+              <span class="fp-tag" data-cat="all">全部</span>
+            </div>
+          </div>
+          <div class="fp-row">
+            <span class="fp-label">年份</span>
+            <select id="ppYear" class="select"><option value="">全部年份</option></select>
+          </div>
+          <div class="fp-row">
+            <span class="fp-label">省份</span>
+            <select id="ppProv" class="select"><option value="">全部省份</option></select>
+          </div>
+          <div class="fp-row">
+            <span class="fp-result" id="ppCount">共 0 套</span>
+          </div>
+        </div>
+        <div id="ppList" class="pp-list"></div>
+      </div>
+
+      <!-- 浏览模式（粉笔式套卷练习） -->
+      <div id="paperView" class="hidden">
+        <!-- 顶部导航栏（对齐粉笔：返回 + 计时器(可暂停) + 卷名 + 右侧操作） -->
+        <div class="pv-topbar">
+          <button class="pv-tb-btn" id="pvBackList">←</button>
+          <div class="pv-tb-timer">
+            <span class="pv-tb-clock">⏱</span>
+            <span id="pvTimer">00:00</span>
+            <button class="pv-tb-pause" id="pvPauseBtn" title="暂停/继续">❚❚</button>
+          </div>
+          <div class="pv-tb-title" id="pvPaperName"></div>
+          <div class="pv-tb-actions">
+            <button class="pv-tb-btn" id="pvDraftBtn" title="打开/关闭草稿区">✏️</button>
+            <button class="pv-tb-btn primary" id="pvSubmitTop" title="交卷">交卷</button>
+          </div>
+        </div>
+
+        <!-- 题目区域 -->
+        <div class="pv-qarea">
+          <div class="card question-card pv-qcard">
+            <!-- 题号行：题号 + 类型 + 右侧操作图标(收藏/草稿/标记) -->
+            <div class="pv-qhead">
+              <div class="pv-qnum" id="pvIndex">--</div>
+              <div class="pv-qtype" id="pvType">— · —</div>
+              <div class="pv-qactions">
+                <button class="pv-qa-btn" id="pvFav" title="收藏">☆</button>
+                <button class="pv-qa-btn" id="pvQDraft" title="草稿">✏</button>
+                <button class="pv-qa-btn" id="pvQMark" title="标记">☆</button>
+              </div>
+            </div>
+            <span class="q-src" id="pvSrc"></span>
+            <div class="q-stem" id="pvStem">—</div>
+            <div id="pvMaterial" class="q-material"></div>
+            <!-- 标记标签（标记后显示在题目区域） -->
+            <div class="pv-mark-tag hidden" id="pvMarkTag">🚩 标记</div>
+            <div class="q-options" id="pvOptions"></div>
+            <div class="q-answer hidden" id="pvAnswer">
+              <div class="ans-row">
+                <span class="ans-label">正确答案</span>
+                <span class="ans-value" id="pvAnsValue">—</span>
+                <span class="ans-tag correct" id="pvAnsTag">已答对</span>
+              </div>
+              <div class="ans-explain" id="pvExplain"></div>
+            </div>
+          </div>
+
+          <!-- 草稿区（每题独立，toggle 显示） -->
+          <div class="pv-draft-panel hidden" id="pvDraftPanel">
+            <div class="pv-draft-head">
+              <span>✏️ 草稿 / 笔记</span>
+              <button class="pv-draft-clear" id="pvDraftClear">清空</button>
+            </div>
+            <textarea class="pv-draft-input" id="pvDraftInput" placeholder="在此打草稿、写笔记...（自动保存到本地）"></textarea>
+          </div>
+        </div>
+
+        <!-- 底部答题卡面板（粉笔式：底部常驻栏 + 可展开详情） -->
+        <div class="pv-ansheet">
+          <div class="pv-as-bar" id="pvAsBar">
+            <span class="pv-as-label">答题卡</span>
+            <span class="pv-as-prog"><span id="pvAsDone">1</span>/<span id="pvAsTotal">135</span></span>
+            <button class="pv-as-toggle" id="pvAsToggle">▼</button>
+          </div>
+          <div class="pv-as-body hidden" id="pvAsBody">
+            <div class="pv-as-scroll" id="pvAsScroll"></div>
+            <div class="pv-as-legend">
+              <span><i class="dot cur"></i>当前</span>
+              <span><i class="dot done"></i>已做</span>
+              <span><i class="dot wrong"></i>做错</span>
+              <span><i class="dot mark"></i>标记</span>
+              <span><i class="dot undone"></i>未做</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 底部操作条 -->
+        <div class="pv-sticky">
+          <button id="pvPrev">← 上一题</button>
+          <button id="pvCheck">查看答案</button>
+          <button id="pvNext">下一题 →</button>
+        </div>
+
+        <!-- 成绩单（交卷后显示） -->
+        <div id="pvResult" class="card hidden">
+          <h3 class="exam-title">套卷练习报告</h3>
+          <div class="score-num" id="pvScoreNum">0</div>
+          <div class="score-sub"><span id="pvScoreCorrect">0</span> 正确 / <span id="pvScoreTotal">0</span> 题 · 用时 <span id="pvTotalTime">00:00</span></div>
+          <div class="score-grid">
+            <div><div class="sg-num" id="pvRight">0</div><div class="sg-cap">正确</div></div>
+            <div><div class="sg-num" id="pvWrong">0</div><div class="sg-cap">错误</div></div>
+            <div><div class="sg-num" id="pvSkip">0</div><div class="sg-cap">未答</div></div>
+            <div><div class="sg-num" id="pvAcc">0%</div><div class="sg-cap">正确率</div></div>
+          </div>
+          <div class="exam-mod-breakdown" id="pvModBreak"></div>
+          <div class="exam-mod-breakdown" id="pvTimeBreak"></div>
+          <div id="pvHistoryChart"></div>
+          <div class="quiz-actions">
+            <button class="btn-primary" id="pvReviewBtn">逐题回顾</button>
+            <button class="btn-ghost" id="pvAgainBtn">再做一次</button>
+            <button class="btn-ghost" id="pvBackList2">返回列表</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- 底部导航 -->
+    <nav class="tabbar">
+      <a class="tab active" data-go="home"><div class="tab-icon">🏠</div><div class="tab-label">首页</div></a>
+      <a class="tab" data-go="practice"><div class="tab-icon">✏️</div><div class="tab-label">刷题</div></a>
+      <a class="tab" data-go="exam"><div class="tab-icon">📝</div><div class="tab-label">模考</div></a>
+      <a class="tab" data-go="mistakes"><div class="tab-icon">📒</div><div class="tab-label">错题</div></a>
+      <a class="tab" data-go="stats"><div class="tab-icon">📈</div><div class="tab-label">统计</div></a>
+      <a class="tab" data-go="coach"><div class="tab-icon">🤖</div><div class="tab-label">教练</div></a>
+    </nav>
+
+  </div>
+
+  <!-- 仅真题：模拟/高仿数据文件(data.js/data-expanded.js/data-meta.js/data-real.js)已于 2026-07-28 移除 -->
+    <script src="js/data-core.js"></script>
+    <script src="js/filter.js"></script>
+    <script src="js/difficulty.js"></script>
+  <script src="bank/manifest.js"></script>
+  <!-- 卷型结构表：按题号定位模块/题型（真题结构是硬标准），须先于 bank-loader 加载 -->
+  <script src="bank/paper-structure.js"></script>
+  <script src="js/bank-loader.js"></script>
+  <script src="js/knowledge-tree-data.js"></script>
+  <script src="js/knowledge-tree.js"></script>
+  <script src="js/classify-tree.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/method-data.js"></script>
+  <script src="js/method-lib.js"></script>
+  <script src="js/speed-drill.js"></script>
+  <script src="js/freq-heatmap.js"></script>
+  <script src="js/diagnosis.js"></script>
+  <script src="js/training.js"></script>
+  <script src="js/tactics.js"></script>
+  <script src="js/experience.js"></script>
+  <script src="js/search.js"></script>
+  <script src="js/tips-data.js"></script>
+  <script src="js/tips-lib.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/coach.js"></script>
+  <script src="js/coach-ui.js"></script>
+  <script src="js/custom-practice.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

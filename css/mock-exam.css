@@ -1,0 +1,30 @@
+/* 真题套卷模考 · 选择器与分模块正确率 */
+.exam-picker { margin: 12px 0; }
+.ep-bar { display: flex; gap: 8px; margin-bottom: 8px; }
+.ep-bar .select { flex: 1; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border, #e2e5ec); background: var(--bg-2, #fff); color: inherit; }
+.ep-list { max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.ep-item { display: flex; flex-direction: column; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border, #e2e5ec); cursor: pointer; transition: .15s; background: var(--bg-2, #fff); }
+.ep-item:hover { border-color: #5b6cff; }
+.ep-item.active { border-color: #5b6cff; background: #eef0ff; }
+.ep-name { font-weight: 600; font-size: 14px; }
+.ep-meta { font-size: 12px; color: #8a90a2; margin-top: 2px; }
+.ep-empty { color: #8a90a2; padding: 16px; text-align: center; }
+
+.exam-mod-breakdown { margin-top: 16px; }
+.emb-title { font-weight: 600; margin-bottom: 8px; }
+.emb-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.emb-mod { width: 48px; font-size: 13px; flex-shrink: 0; }
+.emb-bar { flex: 1; height: 10px; background: var(--bg-2, #eef0f4); border-radius: 6px; overflow: hidden; }
+.emb-fill { display: block; height: 100%; border-radius: 6px; }
+.emb-fill.ok { background: #22c55e; }
+.emb-fill.mid { background: #f59e0b; }
+.emb-fill.low { background: #ef4444; }
+.emb-fill.time { background: linear-gradient(135deg,#22c55e,#16a34a); }
+.emb-num { width: 110px; text-align: right; font-size: 12px; color: #555; flex-shrink: 0; }
+
+@media (prefers-color-scheme: dark) {
+  .ep-bar .select, .ep-item { background: #1a1d27; border-color: #2a2f3d; color: #e6e8ef; }
+  .ep-item.active { background: #232a4a; }
+  .ep-meta, .emb-num { color: #9aa0b4; }
+  .emb-bar { background: #23262f; }
+}

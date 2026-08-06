@@ -1,0 +1,19 @@
+# 部署到 GitHub Pages / 静态托管时排除的项（这些不是 App 运行所需）
+# 体积 301MB 的开发产物，纯本地用，不上传
+_pdfdev/
+
+# bank/ 下的原始转储文件（228MB，不在 manifest，App 不加载）
+bank/_dump_all.json
+
+# 本地导入/开发脚本，非运行时
+粉笔导入/
+tools/
+docs/
+import.html
+行测分析.html
+server.py
+启动行测分析.bat
+
+# 本地离线启动器与说明（可选保留，体积小）
+# open-offline.bat
+# README.md
