@@ -749,7 +749,7 @@
       State.history.push({ id: q.id, module: q._module || findModuleOf(q), correct: true, ts: Date.now() });
       const tk = todayKey(); State.days[tk] = (State.days[tk] || 0) + 1;
       saveState();
-      showQuestion();
+      nextQuestion();
       toast('已展示参考答案要点');
       return;
     }
@@ -777,7 +777,7 @@
       State.mistakes = State.mistakes.filter(x => x !== q.id);
     }
     saveState();
-    showQuestion();
+    nextQuestion();
     toast(isCorrect ? (practiceGuess ? '🎲 蒙对了（已留错题本）' : '✅ 答对了') : '❌ 答错了，已加入错题本');
   }
 
