@@ -713,6 +713,8 @@
     if (eg) { eg.textContent = examGuess ? '🎲 已标蒙' : '🎲 蒙一下'; eg.classList.toggle('active', examGuess); }
   }
 
+  // 粉笔式交互：选择答案后自动提交判分，短暂展示结果后跳下一题
+  let _autoAdvanceTimer = null;
   function selectPractice(i) {
     const q = practiceList[practiceIdx];
     if (!q) return;
@@ -721,6 +723,15 @@
     $$('#qOptions .opt').forEach((el, idx) => {
       el.classList.toggle('selected', idx === i);
     });
+    // 背题模式：只选中不自动跳（用户手动翻页看解析）
+    if (window.CustomPractice && window.CustomPractice.isReviewMode()) return;
+    // 清除之前的延时（防止连点）
+    if (_autoAdvanceTimer) clearTimeout(_autoAdvanceTimer);
+    // 延迟 350ms 让用户看到选中态，然后自动交卷跳题
+    _autoAdvanceTimer = setTimeout(() => {
+      _autoAdvanceTimer = null;
+      checkAnswer();
+    }, 350);
   }
 
   function checkAnswer() {
