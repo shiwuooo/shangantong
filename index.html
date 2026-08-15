@@ -2,12 +2,21 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>上岸通 · 考公刷题</title>
   <meta name="theme-color" content="#5b6cff" />
+  <!-- PWA / 添加到主屏幕 -->
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="上岸通" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="icon" href="icon-192.png" />
   <link rel="stylesheet" href="css/style.css" />
   <link rel="stylesheet" href="css/mock-exam.css" />
   <link rel="stylesheet" href="css/features.css" />
+  <link rel="stylesheet" href="css/pad.css" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%235b6cff'/%3E%3Ctext x='50%25' y='55%25' font-size='40' text-anchor='middle' fill='white' font-family='system-ui'%3E上%3C/text%3E%3C/svg%3E" />
 </head>
 <body>
@@ -92,6 +101,28 @@
           </div>
         </div>
         <div class="mbn-go">查看 →</div>
+      </a>
+
+      <a class="modules-banner card sp-entrance" href="#special">
+        <div class="mbn-left">
+          <div class="mbn-icon">🎯</div>
+          <div class="mbn-text">
+            <div class="mbn-title">专项练习 · 粉笔同源复刻</div>
+            <div class="mbn-sub">考点标签云精准开刷 · 练习配置 · 智能推题 · 一对一诊断</div>
+          </div>
+        </div>
+        <div class="mbn-go">进入 →</div>
+      </a>
+
+      <a class="modules-banner card mk-entrance" href="#mock">
+        <div class="mbn-left">
+          <div class="mbn-icon">🏛️</div>
+          <div class="mbn-text">
+            <div class="mbn-title">模考库 · 粉笔同源复刻</div>
+            <div class="mbn-sub">国考限时模考 · 副省级 / 行政执法类 / 地市级 · 全真整卷</div>
+          </div>
+        </div>
+        <div class="mbn-go">进入 →</div>
       </a>
 
       <section class="quick-actions">
@@ -360,8 +391,14 @@
         </div>
       </div>
 
-      <!-- 筛选面板 -->
+      <!-- 筛选面板（浮动弹窗 · 对标粉笔） -->
+      <div class="fp-backdrop" id="fpBackdrop"></div>
       <div class="filter-panel hidden" id="filterPanel">
+        <div class="fp-header">
+          <h3>⚙ 自定义筛选</h3>
+          <button class="fp-close" id="fpClose" title="关闭">✕</button>
+        </div>
+        <div class="fp-body">
         <div class="fp-row">
           <span class="fp-label">模块</span>
           <div class="fp-tags" id="fpModules"></div>
@@ -428,6 +465,7 @@
           <button class="btn-primary small" id="fpApply">应用筛选</button>
           <button class="btn-ghost small" id="fpClear">清除</button>
         </div>
+        </div><!-- /.fp-body -->
       </div>
 
       <!-- 自定义刷题面板（参考粉笔） -->
@@ -479,7 +517,14 @@
       </div>
 
       <div class="card question-card" id="qCard">
-        <div class="q-type" id="qType">— · —</div>
+        <div class="q-header-row">
+          <div class="q-type" id="qType">— · —</div>
+          <div class="q-toolbar" id="qToolbar">
+            <button class="qt-btn qt-mark" id="qtMark" title="标记本题">🚩</button>
+            <button class="qt-btn qt-draft" id="qtDraft" title="草稿板">✏️</button>
+            <button class="qt-btn qt-fav" id="qtFav" title="收藏">⭐</button>
+          </div>
+        </div>
         <span class="q-timer" id="qTimer">00:00</span>
         <div class="q-src" id="qSrc"></div>
         <div class="q-stem" id="qStem">加载中...</div>
@@ -500,7 +545,54 @@
         <button class="btn-ghost warn" id="favBtn">⭐ 收藏</button>
         <button class="btn-ghost" id="guessBtn">🎲 蒙一下</button>
         <button class="btn-primary" id="checkBtn">查看答案</button>
-        <button class="btn-primary next" id="nextBtn">下一题 →</button>
+        <button class="btn-ghost" id="nextBtn">下一题 →</button>
+        <button class="btn-primary danger" id="pSubmit">交卷</button>
+      </div>
+
+      <!-- 草稿板弹层 -->
+      <div class="draft-overlay hidden" id="draftOverlay">
+        <div class="draft-bar">
+          <span class="draft-title">✏️ 草稿板</span>
+          <div class="draft-tools">
+            <button class="draft-tool-btn" id="draftPen" title="画笔">✏️ 画笔</button>
+            <button class="draft-tool-btn" id="draftEraser" title="橡皮">🧹 橡皮</button>
+            <button class="draft-tool-btn" id="draftUndo" title="撤销">↩ 撤销</button>
+            <button class="draft-tool-btn" id="draftClear" title="清空">🗑️ 清空</button>
+            <button class="draft-tool-btn primary" id="draftClose" title="关闭">✕ 关闭</button>
+          </div>
+        </div>
+        <canvas id="draftCanvas"></canvas>
+      </div>
+
+      <!-- 模考草稿板弹层 -->
+      <div class="draft-overlay hidden" id="eDraftOverlay">
+        <div class="draft-bar">
+          <span class="draft-title">✏️ 草稿板</span>
+          <div class="draft-tools">
+            <button class="draft-tool-btn" id="eDraftPen" title="画笔">✏️ 画笔</button>
+            <button class="draft-tool-btn" id="eDraftEraser" title="橡皮">🧹 橡皮</button>
+            <button class="draft-tool-btn" id="eDraftUndo" title="撤销">↩ 撤销</button>
+            <button class="draft-tool-btn" id="eDraftClear" title="清空">🗑️ 清空</button>
+            <button class="draft-tool-btn primary" id="eDraftClose" title="关闭">✕ 关闭</button>
+          </div>
+        </div>
+        <canvas id="eDraftCanvas"></canvas>
+      </div>
+
+      <!-- 答题卡弹层（粉笔式：首次交卷显示预览，二次确认才交） -->
+      <div class="ac-overlay hidden" id="acOverlay">
+        <div class="ac-panel">
+          <div class="ac-head">
+            <span class="ac-title">答题卡</span>
+            <button class="ac-close" id="acClose">✕</button>
+          </div>
+          <div class="ac-stats" id="acStats"></div>
+          <div class="ac-grid" id="acGrid"></div>
+          <div class="ac-actions">
+            <button class="btn-ghost" id="acBack">继续做题</button>
+            <button class="btn-primary danger big" id="acConfirm">确认交卷</button>
+          </div>
+        </div>
       </div>
     </main>
 
@@ -549,6 +641,7 @@
           <button class="btn-ghost" id="ePrev">上一题</button>
           <button class="btn-ghost warn" id="eMark">🚩 标记</button>
           <button class="btn-ghost" id="examGuessBtn">🎲 蒙一下</button>
+          <button class="btn-ghost" id="eDraft">✏️ 草稿</button>
           <button class="btn-primary" id="eNext">下一题</button>
           <button class="btn-primary danger" id="eSubmit">交卷</button>
         </div>
@@ -761,6 +854,26 @@
       <div id="modulesRoot"></div>
     </main>
 
+    <!-- 专项练习（粉笔同源复刻 · 独立新增，原 #modules 树形页保持不变） -->
+    <main class="page hidden" id="page-special">
+      <div class="page-head">
+        <button class="back" data-back="home">←</button>
+        <div class="ph-title">专项练习</div>
+        <div class="ph-right"></div>
+      </div>
+      <div id="specialRoot"></div>
+    </main>
+
+    <!-- 模考库（独立栏目 · 粉笔同源复刻） -->
+    <main class="page hidden" id="page-mock">
+      <div class="page-head">
+        <button class="back" data-back="home">←</button>
+        <div class="ph-title">模考库</div>
+        <div class="ph-right"></div>
+      </div>
+      <div id="mockRoot"></div>
+    </main>
+
     <!-- 真题套卷库 -->
     <main class="page hidden" id="page-papers">
       <div class="page-head">
@@ -814,6 +927,14 @@
 
         <!-- 题目区域 -->
         <div class="pv-qarea">
+          <!-- 题目导航条（紧贴题目上方，随时可翻） -->
+          <div class="pv-qnav">
+            <button class="pv-qnav-btn" id="pvPrevTop">← 上一题</button>
+            <div class="pv-qnav-info">
+              <span id="pvNavIdx">1</span> / <span id="pvNavTotal">135</span>
+            </div>
+            <button class="pv-qnav-btn" id="pvNextTop">下一题 →</button>
+          </div>
           <div class="card question-card pv-qcard">
             <!-- 题号行：题号 + 类型 + 右侧操作图标(收藏/草稿/标记) -->
             <div class="pv-qhead">
@@ -841,13 +962,26 @@
             </div>
           </div>
 
-          <!-- 草稿区（每题独立，toggle 显示） -->
+          <!-- 草稿画布区（每题独立，toggle 显示，支持触控/鼠标/电容笔手写） -->
           <div class="pv-draft-panel hidden" id="pvDraftPanel">
             <div class="pv-draft-head">
-              <span>✏️ 草稿 / 笔记</span>
-              <button class="pv-draft-clear" id="pvDraftClear">清空</button>
+              <span>✏️ 草稿 / 手写板</span>
+              <div class="pv-draft-tools">
+                <button class="pv-draft-tool" id="pvDraftPen" title="画笔">✎</button>
+                <button class="pv-draft-tool" id="pvDraftEraser" title="橡皮">◯</button>
+                <span class="pv-draft-colors">
+                  <button class="pv-draft-color active" data-color="#1a1a2e" style="background:#1a1a2e" title="黑"></button>
+                  <button class="pv-draft-color" data-color="#e23b3b" style="background:#e23b3b" title="红"></button>
+                  <button class="pv-draft-color" data-color="#2563eb" style="background:#2563eb" title="蓝"></button>
+                  <button class="pv-draft-color" data-color="#ffffff" style="background:#ffffff;border:1px solid #cbd5e1" title="白"></button>
+                </span>
+                <button class="pv-draft-tool" id="pvDraftUndo" title="撤销">↩</button>
+                <button class="pv-draft-clear" id="pvDraftClear">清空</button>
+              </div>
             </div>
-            <textarea class="pv-draft-input" id="pvDraftInput" placeholder="在此打草稿、写笔记...（自动保存到本地）"></textarea>
+            <canvas class="pv-draft-canvas" id="pvDraftCanvas"></canvas>
+            <!-- 保留文字备注作为补充 -->
+            <textarea class="pv-draft-input" id="pvDraftInput" placeholder="文字备注（可选）..."></textarea>
           </div>
         </div>
 
@@ -920,6 +1054,11 @@
   <!-- 卷型结构表：按题号定位模块/题型（真题结构是硬标准），须先于 bank-loader 加载 -->
   <script src="bank/paper-structure.js"></script>
   <script src="js/bank-loader.js"></script>
+  <!-- 粉笔式专项练习：完整考点树 + 本地映射/掌握度/智能推题 -->
+  <script src="js/fenbi-keypoints.js"></script>
+  <script src="js/keypoint-practice.js"></script>
+  <script src="js/special-practice.js"></script>
+  <script src="js/mock-practice.js"></script>
   <script src="js/knowledge-tree-data.js"></script>
   <script src="js/knowledge-tree.js"></script>
   <script src="js/classify-tree.js"></script>
@@ -940,5 +1079,50 @@
   <script src="js/coach-ui.js"></script>
   <script src="js/custom-practice.js"></script>
   <script src="js/app.js"></script>
+  <!-- PWA：注册 Service Worker（仅 http/https，file:// 下跳过，避免报错） -->
+  <script>
+    (function () {
+      try {
+        if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+          window.addEventListener('load', function () {
+            navigator.serviceWorker.register('./sw.js').catch(function () {});
+          });
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <!-- 练习报告（粉笔式诊断卡 · 专项练习 / 刷题通用） -->
+  <div class="sp-report-overlay hidden" id="spReportOverlay">
+    <div class="sp-report">
+      <div class="sp-report-head">练习报告</div>
+      <div class="sp-report-score" id="rptScore">0%</div>
+      <div class="sp-report-sub" id="rptSub"></div>
+      <div class="sp-report-stats" id="rptStats"></div>
+      <div class="sp-report-body">
+        <div class="sp-report-col">
+          <div class="rpt-sec-title">错题回顾（<span id="rptWrongCount">0</span>）</div>
+          <div class="rpt-wrong" id="rptWrong"></div>
+        </div>
+        <div class="sp-report-col">
+          <div class="rpt-sec-title">📌 智能推荐 · 同类题强化（<span id="rptRecCount">0</span>）</div>
+          <div class="rpt-rec-note">基于你的错题考点自动组卷，点「重练」即可开刷</div>
+        </div>
+      </div>
+      <div class="sp-report-ai" id="rptAIArea">
+        <div class="rpt-sec-title">🤖 AI 一对一复盘</div>
+        <div class="rpt-ai-note">基于本次练习的错题、用时、考点，自动生成复盘 prompt。复制到 OpenCode（DeepSeek V4 Flash + High）提问，把回答贴回即可保存。</div>
+        <div class="rpt-ai-actions">
+          <button class="sp-btn sp-btn-primary" id="rptAICopy">复制复盘 Prompt</button>
+          <button class="sp-btn" id="rptAIPaste">贴回 AI 回答并保存</button>
+        </div>
+        <textarea class="rpt-ai-paste" id="rptAIPasteBox" placeholder="把 AI 的回答粘贴到这里，再点「贴回保存」"></textarea>
+      </div>
+      <div class="sp-report-actions">
+        <button class="sp-btn" id="rptClose">查看解析回顾</button>
+        <button class="sp-btn sp-btn-primary" id="rptRedo">重练薄弱考点 →</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

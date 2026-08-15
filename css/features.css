@@ -234,6 +234,25 @@
 .pv-qarea { flex:1; padding:10px 14px 0; }
 .pv-qcard { position:relative; }
 
+/* 题目导航条（上一题/题号/下一题，紧贴题目上方） */
+.pv-qnav {
+  display:flex; align-items:center; gap:8px;
+  padding:8px 4px; margin-bottom:6px;
+}
+.pv-qnav-btn {
+  flex:1; border-radius:10px; padding:8px 12px; font-size:13px; font-weight:600;
+  background:var(--card); color:var(--text); border:1px solid var(--border);
+  display:flex; align-items:center; justify-content:center; gap:4px;
+  cursor:pointer; transition:all .15s; box-shadow:var(--shadow);
+}
+.pv-qnav-btn:active { transform:scale(0.96); background:var(--bg); }
+.pv-qnav-btn:first-child { color:#5b6cff; }
+.pv-qnav-btn:last-child { color:#ff5b2e; }
+.pv-qnav-info {
+  font-variant-numeric:tabular-nums; font-weight:700; font-size:14px;
+  color:var(--text-2); min-width:50px; text-align:center; white-space:nowrap;
+}
+
 /* 每题头部：题号 + 类型 + 右侧操作图标(☆收藏/✏草稿/☆标记) */
 .pv-qhead {
   display:flex; align-items:center; gap:8px; margin-bottom:8px;
@@ -262,25 +281,47 @@
   margin:6px 0; border:1px solid #ffd699;
 }
 
-/* ---- 草稿面板 ---- */
+/* ---- 草稿面板（画布 + 文字备注） ---- */
 .pv-draft-panel {
   margin-top:10px; border:1px solid var(--border); border-radius:12px;
   background:var(--card); overflow:hidden; box-shadow:var(--shadow);
 }
 .pv-draft-head {
   display:flex; justify-content:space-between; align-items:center;
+  flex-wrap:wrap; gap:6px;
   padding:8px 12px; background:var(--bg); border-bottom:1px solid var(--border);
   font-size:13px; font-weight:600; color:var(--text);
 }
+.pv-draft-tools {
+  display:flex; align-items:center; gap:4px;
+}
+.pv-draft-tool {
+  background:none; border:1px solid var(--border); border-radius:6px;
+  color:var(--text-3); font-size:14px; padding:3px 7px; cursor:pointer;
+  min-width:28px; text-align:center; transition:all .15s;
+}
+.pv-draft-tool:hover, .pv-draft-tool.active { background:var(--bg); color:var(--text); border-color:#5b6cff; }
+.pv-draft-colors { display:flex; align-items:center; gap:3px; margin:0 4px; }
+.pv-draft-color {
+  width:20px; height:20px; border-radius:50%; border:2px solid transparent;
+  cursor:pointer; padding:0; transition:all .15s;
+}
+.pv-draft-color.active { border-color:#5b6cff; box-shadow:0 0 0 2px rgba(91,108,255,.3); transform:scale(1.15); }
 .pv-draft-clear {
   background:none; border:1px solid var(--border); border-radius:6px;
   color:var(--text-3); font-size:11px; padding:2px 8px; cursor:pointer;
 }
 .pv-draft-clear:hover { color:#e23b3b; border-color:#ffc4c4; }
+/* 画布：全宽、触控友好 */
+.pv-draft-canvas {
+  width:100%; height:300px; display:block;
+  background:#fff; border:none; touch-action:none;
+  cursor:crosshair; image-rendering:-webkit-optimize-contrast;
+}
 .pv-draft-input {
-  width:100%; min-height:120px; max-height:300px;
-  border:none; background:var(--card); color:var(--text);
-  padding:10px 12px; font-size:14px; line-height:1.6;
+  width:100%; min-height:60px; max-height:150px;
+  border:none; border-top:1px solid var(--border); background:var(--card); color:var(--text);
+  padding:8px 12px; font-size:13px; line-height:1.5;
   resize:vertical; box-sizing:border-box; outline:none;
   font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
 }
@@ -524,6 +565,11 @@
   .pv-as-legend { border-top-color:#252a38; color:#6b778f; }
   .pv-sticky { background:#11131a; border-top-color:#252a38; }
   .pv-sticky button { background:#1a1d27; color:#e8ebf2; border-color:#2a2f3e; }
+  .pv-qnav-btn { background:#1a1d27; color:#e8ebf2; border-color:#2a2f3e; }
+  .pv-qnav-info { color:#9aa4ba; }
+  .pv-draft-tool { border-color:#353b50; color:#9aa4ba; }
+  .pv-draft-tool:hover, .pv-draft-tool.active { background:#252a38; color:#e8ebf2; border-color:#5b6cff; }
+  .pv-draft-canvas { background:#fafafa; } /* 画布保持浅色，方便书写 */
 
   .db-mod-gap.ok { color: #22c55e; }
 
@@ -688,4 +734,421 @@
     border-color: #4a7dc8; background: #1a2a4a; color: #7baef0;
   }
   .cp-actions { border-top-color: #2a2f3c; }
+}
+
+/* ===== 专项练习 · 粉笔式考点树（融合粉笔专项练习） ===== */
+.kt-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.kt-tb-left { display: flex; gap: 8px; flex-wrap: wrap; }
+.kt-btn { border: 1px solid #d6dbe6; background: #fff; color: #3a4250; border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+.kt-btn:hover { background: #f0f3fa; }
+.kt-btn-weak { border-color: #f0c27a; background: #fff7e9; color: #b8761a; font-weight: 600; }
+.kt-btn-weak:hover { background: #ffefd3; }
+.kt-legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: #6b7180; align-items: center; }
+.kt-leg { display: flex; align-items: center; gap: 4px; }
+.kt-leg i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.kt-note { font-size: 12px; color: #6b7180; background: #f6f8fc; border: 1px solid #e6ebf3; border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; line-height: 1.5; }
+
+.kt-module { margin-bottom: 12px; }
+.kt-module > .kt-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px; cursor: pointer; }
+.kt-mod-head { background: linear-gradient(90deg, #eef3ff, #f7f9ff); border: 1px solid #dbe4f5; border-radius: 12px; }
+.kt-icon { font-size: 20px; }
+.kt-name { font-weight: 700; font-size: 15px; color: #1f2733; }
+.kt-count { font-size: 12px; color: #6b7180; margin-left: auto; }
+.kt-fb { font-size: 11px; color: #9aa3b2; }
+.kt-mod-go { font-size: 12px; color: #3a6fd0; text-decoration: none; margin-left: 8px; white-space: nowrap; }
+.kt-mod-go:hover { text-decoration: underline; }
+.kt-caret { display: inline-block; transition: transform .15s; color: #8a93a6; font-size: 12px; width: 14px; }
+.kt-module[data-open="1"] > .kt-head .kt-caret,
+.kt-node[data-open="1"] > .kt-head .kt-caret { transform: rotate(90deg); }
+.kt-children { padding-left: 18px; border-left: 2px solid #eef1f7; margin: 2px 0 8px 8px; }
+
+.kt-node { }
+.kt-node > .kt-head { display: flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 8px; }
+.kt-node.kt-has-kids > .kt-head { cursor: pointer; }
+.kt-node.kt-has-kids > .kt-head:hover { background: #f3f6fc; }
+.kt-node.kt-leaf > .kt-head { background: #fafbfd; border: 1px solid #eef1f7; margin: 3px 0; }
+.kt-caret-leaf { color: #c2c9d6; }
+.kt-acc { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 20px; white-space: nowrap; }
+.kt-acc.kt-easy { color: #16a34a; background: #e7f7ec; }
+.kt-acc.kt-mid { color: #d97706; background: #fdf0dc; }
+.kt-acc.kt-hard { color: #ea580c; background: #fde8dc; }
+.kt-acc.kt-ext { color: #dc2626; background: #fde4e4; }
+.kt-acc.kt-un { color: #6b7180; background: #f1f3f9; }
+.kt-go { margin-left: 6px; border: 1px solid #cdd8ef; background: #fff; color: #3a6fd0; border-radius: 6px; padding: 3px 9px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.kt-go:hover { background: #eaf1ff; }
+.kt-go:active { background: #dfe8ff; }
+
+@media (prefers-color-scheme: dark) {
+  .kt-btn { border-color: #2a2f3e; background: #1a1d27; color: #c7cdda; }
+  .kt-btn:hover { background: #222838; }
+  .kt-btn-weak { border-color: #5a4420; background: #2a2113; color: #e0a85a; }
+  .kt-btn-weak:hover { background: #352916; }
+  .kt-legend { color: #8a93a6; }
+  .kt-note { background: #1a1d27; border-color: #262c3a; color: #8a93a6; }
+  .kt-mod-head { background: linear-gradient(90deg, #16203a, #10131c); border-color: #26314a; }
+  .kt-name { color: #e6e9f2; }
+  .kt-count { color: #8a93a6; }
+  .kt-fb { color: #6b7280; }
+  .kt-mod-go { color: #7baef0; }
+  .kt-caret { color: #5b6478; }
+  .kt-children { border-left-color: #262c3a; }
+  .kt-node.kt-has-kids > .kt-head:hover { background: #1c2030; }
+  .kt-node.kt-leaf > .kt-head { background: #161824; border-color: #252a38; }
+  .kt-caret-leaf { color: #3a4252; }
+  .kt-go { border-color: #2c3654; background: #10131c; color: #7baef0; }
+  .kt-go:hover { background: #1a2440; }
+  .kt-acc.kt-easy { background: #16321f; }
+  .kt-acc.kt-mid { background: #332818; }
+  .kt-acc.kt-hard { background: #332018; }
+  .kt-acc.kt-ext { background: #331717; }
+  .kt-acc.kt-un { background: #232838; }
+}
+
+/* ============================================
+ * 刷题筛选面板 · 粉笔层级考点树（fkt = filter keypoint tree）
+ * ============================================ */
+.fkt-module-group { margin-bottom: 4px; }
+.fkt-node { margin-left: 0; }
+.fkt-node.collapsed > .fkt-children { display: none; }
+
+.fkt-row {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; margin: 1px 0;
+  border-radius: 6px; cursor: pointer; transition: background .15s;
+  font-size: 13px; line-height: 1.5;
+}
+.fkt-row:hover { background: #eef2fa; }
+.fkt-row.active { background: #dce6fb; font-weight: 600; }
+
+.fkt-root > .fkt-row { font-weight: 700; font-size: 14px; color: #1a365d; border-bottom: 2px solid #e2e8f0; margin-bottom: 2px; }
+.fkt-root > .fkt-row.active { background: #c7d6ef; }
+
+.fkt-caret { font-size: 11px; width: 16px; text-align: center; color: #64748b; user-select: none; flex-shrink: 0; cursor: pointer; }
+.fkt-dot { width: 6px; height: 6px; border-radius: 50%; background: #94a3b8; flex-shrink: 0; margin-left: 10px; }
+.fkt-label { cursor: pointer; white-space: nowrap; }
+.fkt-badge {
+  font-size: 11px; padding: 1px 7px; border-radius: 10px;
+  background: #e2e8f0; color: #475569; font-weight: 500; flex-shrink: 0; min-width: 22px; text-align: center;
+}
+.fkt-badge.empty { background: #fef3c7; color: #92400e; opacity: .75; }
+.fkt-row.active .fkt-badge { background: #3b82f6; color: #fff; }
+.fkt-row.active .fkt-badge.empty { background: #f59e0b; color: #fff; }
+
+.fkt-children { margin-left: 18px; padding-left: 12px; border-left: 2px dashed #e2e8f0; }
+
+@media (prefers-color-scheme: dark) {
+  .fkt-row { color: #cbd5e1; }
+  .fkt-row:hover { background: #1e293b; }
+  .fkt-row.active { background: #1e3a5f; }
+  .fkt-root > .fkt-row { color: #93c5fd; border-color: #334155; }
+  .fkt-root > .fkt-row.active { background: #1a365d; }
+  .fkt-caret { color: #64748b; }
+  .fkt-dot { background: #475569; }
+  .fkt-badge { background: #334155; color: #94a3b8; }
+  .fkt-badge.empty { background: #78350f; color: #fbbf24; opacity: .7; }
+  .fkt-row.active .fkt-badge { background: #2563eb; color: #fff; }
+  .fkt-children { border-left-color: #334155; }
+}
+
+/* ============================================
+ * 每题工具栏（qt = question toolbar）
+ * ============================================ */
+.q-header-row {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 6px;
+}
+.q-toolbar {
+  display: flex; gap: 4px; align-items: center;
+}
+.qt-btn {
+  background: none; border: 1px solid #e2e8f0; border-radius: 6px;
+  padding: 3px 8px; font-size: 15px; cursor: pointer;
+  transition: all .15s; line-height: 1.4; opacity: .7;
+}
+.qt-btn:hover { opacity: 1; background: #f1f5f9; border-color #cbd5e1; }
+.qt-btn.active { opacity: 1; background: #fef08a; border-color #eab308; }
+.qt-mark.active { background: #fecaca !important; border-color #ef4444 !important; }
+.qt-fav.active { background: #fef9c3 !important; border-color #eab308 !important; }
+
+/* 草稿板：右侧滑出，不遮挡题目主体 */
+.draft-overlay {
+  position: fixed; top: 0; right: 0; bottom: 0;
+  width: 400px; max-width: 80vw;
+  z-index: 1000;
+  display: flex; flex-direction: column;
+  background: rgba(255,255,255,.96);
+  box-shadow: -6px 0 30px rgba(0,0,0,.14);
+  transform: translateX(0);
+  transition: transform .25s ease, opacity .25s ease;
+  opacity: 1;
+}
+.draft-overlay.hidden {
+  display: flex !important;
+  transform: translateX(100%);
+  opacity: 0;
+  pointer-events: none;
+}
+.draft-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; background: #fff; border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+.draft-title { font-weight: 600; font-size: 15px; color: #1e293b; }
+.draft-tools { display: flex; gap: 6px; flex-wrap: wrap; }
+.draft-tool-btn {
+  padding: 5px 10px; border: 1px solid #cbd5e1; border-radius: 6px;
+  background: #fff; cursor: pointer; font-size: 12px; transition: all .15s;
+}
+.draft-tool-btn:hover { background: #f1f5f9; }
+.draft-tool-btn.primary { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+.draft-tool-btn.primary:hover { background: #2563eb; }
+#draftCanvas {
+  flex: 1; width: 100%; touch-action: none; cursor: crosshair;
+  background: #fff; background-image:
+    linear-gradient(90deg, #f1f5f9 1px, transparent 1px),
+    linear-gradient(#f1f5f9 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+/* 桌面端再宽一点，方便演草 */
+@media (min-width: 1200px) {
+  .draft-overlay { width: 460px; }
+}
+
+@media (prefers-color-scheme: dark) {
+  .qt-btn { border-color: #334155; color: #e2e8f0; }
+  .qt-btn:hover { background: #1e293b; border-color: #475569; }
+  .qt-btn.active { background: #422006; border-color: #d97706; }
+  .qt-mark.active { background: #450a0a !important; border-color #dc2626 !important; }
+  .qt-fav.active { background: #422006 !important; border-color: #d97706 !important; }
+  .draft-overlay { background: rgba(30,41,59,.96); }
+  .draft-bar { background: #1e293b; border-color: #334155; }
+  .draft-title { color: #f1f5f9; }
+  .draft-tool-btn { background: #334155; color: #e2e8f0; border-color: #475569; }
+  .draft-tool-btn:hover { background: #475569; }
+  .draft-tool-btn.primary { background: #2563eb; border-color: #2563eb; }
+  #draftCanvas { background: #0f172a; background-image:
+    linear-gradient(90deg, #1e293b 1px, transparent 1px),
+    linear-gradient(#1e293b 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+}
+
+/* ============================================
+ * 答题卡弹层（ac = answer card）
+ * ============================================ */
+.ac-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 1000; background: rgba(0,0,0,.5);
+  display: flex; align-items: center; justify-content: center;
+}
+.ac-overlay.hidden { display: none; }
+
+/* ============================================
+ * 专项练习（粉笔同源复刻 · sp = special practice）
+ * ============================================ */
+.sp-entrance { border: 1px solid #4e6ef2; background: linear-gradient(135deg, #eef2ff, #f8faff); }
+.sp-entrance .mbn-icon { color: #4e6ef2; }
+.sp-top { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.sp-top-left { display: flex; gap: 8px; flex-wrap: wrap; }
+.sp-btn { border: 1px solid #d8dee9; background: #fff; color: #333; padding: 7px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: .15s; }
+.sp-btn:hover { border-color: #4e6ef2; color: #4e6ef2; }
+.sp-btn-primary { background: #4e6ef2; color: #fff; border-color: #4e6ef2; }
+.sp-btn-primary:hover { background: #3b5bdb; color: #fff; }
+.sp-legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: #667; }
+.sp-note { font-size: 12.5px; color: #889; margin-bottom: 14px; line-height: 1.6; }
+.sp-module { margin-bottom: 12px; }
+.sp-mod-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; cursor: pointer; user-select: none; }
+.sp-mod-head:hover { background: #f7f9fc; }
+.sp-icon { font-size: 20px; }
+.sp-mod-name { font-weight: 600; font-size: 15px; }
+.sp-mod-cnt { color: #889; font-size: 13px; margin-left: auto; }
+.sp-tags { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 14px 14px; }
+.sp-tag { display: flex; flex-direction: column; gap: 3px; border: 1px solid #e2e8f0; background: #fff; border-radius: 10px; padding: 8px 12px; cursor: pointer; text-align: left; min-width: 96px; transition: .15s; }
+.sp-tag:hover { border-color: #4e6ef2; box-shadow: 0 2px 8px rgba(78,110,242,.12); transform: translateY(-1px); }
+.sp-tag-name { font-size: 13.5px; font-weight: 500; color: #222; }
+.sp-tag-meta { font-size: 11.5px; color: #889; display: flex; align-items: center; gap: 5px; }
+.sp-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+/* 配置弹窗 */
+.sp-config-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.45); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.sp-config-overlay.hidden { display: none; }
+.sp-config { background: #fff; border-radius: 16px; padding: 22px; width: min(420px, 92vw); box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+.sp-config-head { font-size: 16px; margin-bottom: 4px; }
+.sp-config-sub { font-size: 13px; color: #889; margin-bottom: 16px; }
+.sp-field { margin-bottom: 14px; }
+.sp-field > label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #445; }
+.sp-field-row { display: flex; align-items: center; gap: 8px; }
+.sp-field input[type=number] { width: 120px; padding: 8px 10px; border: 1px solid #d8dee9; border-radius: 8px; font-size: 14px; }
+.sp-hint { font-size: 12px; color: #aab; }
+.sp-seg { display: inline-flex; border: 1px solid #d8dee9; border-radius: 8px; overflow: hidden; }
+.sp-seg button { border: none; background: #fff; padding: 8px 16px; cursor: pointer; font-size: 13px; color: #556; }
+.sp-seg button.on { background: #4e6ef2; color: #fff; }
+.sp-config-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+
+/* 练习报告（粉笔式诊断卡） */
+.sp-report-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.5); display: flex; align-items: center; justify-content: center; z-index: 1001; }
+.sp-report-overlay.hidden { display: none; }
+.sp-report { width: 92%; max-width: 560px; max-height: 88vh; overflow: auto; background: #fff; border-radius: 18px; padding: 26px; box-shadow: 0 24px 70px rgba(0,0,0,.3); text-align: center; }
+.sp-report-head { font-size: 14px; color: #889; letter-spacing: 1px; }
+.sp-report-score { font-size: 54px; font-weight: 800; color: #4e6ef2; line-height: 1.1; margin: 6px 0; }
+.sp-report-sub { font-size: 15px; color: #333; margin-bottom: 10px; }
+.sp-report-stats { font-size: 13.5px; color: #667; margin-bottom: 16px; }
+.sp-report-stats b { color: #222; }
+.sp-report-body { display: flex; gap: 16px; text-align: left; }
+.sp-report-col { flex: 1; min-width: 0; }
+.rpt-sec-title { font-size: 13px; font-weight: 600; color: #445; margin-bottom: 8px; border-left: 3px solid #4e6ef2; padding-left: 8px; }
+.rpt-wrong { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow: auto; }
+.rpt-wrong-item { font-size: 12.5px; color: #555; background: #f7f9fc; border: 1px solid #eef1f6; border-radius: 8px; padding: 6px 9px; cursor: pointer; }
+.rpt-wrong-item:hover { border-color: #4e6ef2; }
+.rpt-wrong-tag { float: right; color: #dc2626; font-size: 11px; }
+.rpt-empty { font-size: 13px; color: #16a34a; }
+.rpt-rec-note { font-size: 12px; color: #aab; }
+.sp-report-actions { display: flex; gap: 10px; justify-content: center; margin-top: 20px; }
+.sp-report-ai { text-align: left; margin-top: 18px; padding-top: 16px; border-top: 1px dashed #e2e8f0; }
+.rpt-ai-note { font-size: 12px; color: #667; line-height: 1.6; margin: 6px 0 10px; }
+.rpt-ai-actions { display: flex; gap: 8px; margin-bottom: 8px; }
+.rpt-ai-paste { width: 100%; min-height: 90px; border: 1px solid #d1d5db; border-radius: 8px; padding: 8px; font-size: 12.5px; resize: vertical; }
+@media (prefers-color-scheme: dark) {
+  .sp-report { background: #1b2130; }
+  .sp-report-score { color: #7c9bff; }
+  .sp-report-sub { color: #e6e9f0; }
+  .sp-report-stats { color: #aab; }
+  .sp-report-stats b { color: #e6e9f0; }
+  .rpt-sec-title { color: #cdd; }
+  .rpt-wrong-item { background: #1c2333; border-color: #2c3550; color: #cdd; }
+  .rpt-empty { color: #4ade80; }
+  .rpt-rec-note { color: #889; }
+  .sp-report-ai { border-color: #2c3550; }
+  .rpt-ai-note { color: #889; }
+  .rpt-ai-paste { background: #1c2333; border-color: #3b82f6; color: #e6e9f0; }
+}
+@media (prefers-color-scheme: dark) {
+  .sp-entrance { background: linear-gradient(135deg, #1b2440, #1a1f33); border-color: #3b5bdb; }
+  .sp-entrance .mbn-icon { color: #7c9bff; }
+  .sp-btn { background: #222a3d; border-color: #334; color: #cdd; }
+  .sp-btn:hover { border-color: #5b7cfa; color: #fff; }
+  .sp-mod-head:hover { background: #1c2333; }
+  .sp-tag { background: #1c2333; border-color: #2c3550; }
+  .sp-tag-name { color: #e6e9f0; }
+  .sp-config { background: #1b2130; }
+  .sp-field > label { color: #bcc; }
+  .sp-seg button { background: #1c2333; color: #cdd; }
+  .sp-seg button.on { background: #4e6ef2; }
+}
+.ac-panel {
+  width: 90%; max-width: 520px; max-height: 85vh;
+  background: #fff; border-radius: 16px;
+  display: flex; flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0,0,0,.2);
+}
+.ac-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid #e2e8f0;
+}
+.ac-title { font-size: 18px; font-weight: 700; color: #1e293b; }
+.ac-close {
+  background: none; border: none; font-size: 22px; cursor: pointer;
+  color: #94a3b8; padding: 4px 8px; border-radius: 6px;
+}
+.ac-close:hover { background: #f1f5f9; color: #475569; }
+.ac-stats {
+  display: flex; gap: 16px; padding: 12px 20px;
+  font-size: 14px; color: #475569; border-bottom: 1px solid #f1f5f9;
+}
+.ac-stat { font-weight: 600; }
+.ac-stat .num { color: #2563eb; font-weight: 700; }
+.ac-grid {
+  flex: 1; overflow-y: auto; padding: 16px 20px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  gap: 8px; align-content: start;
+}
+.ac-cell {
+  aspect-ratio: 1; border-radius: 10px; display: flex; align-items: center;
+  justify-content: center; font-size: 14px; font-weight: 600; cursor: pointer;
+  border: 2px solid #e2e8f0; background: #fff; color: #64748b;
+  transition: all .15s; user-select: none;
+}
+.ac-cell:hover { border-color: #93c5fd; transform: scale(1.08); }
+/* 已答 */
+.ac-cell.answered { background: #2563eb; border-color: #2563eb; color: #fff; }
+/* 未答 */
+.ac-cell.unanswered { background: #f8fafc; border-color: #e2e8f0; color: #94a3b8; }
+/* 标记 */
+.ac-cell.marked { position: relative; }
+.ac-cell.marked::after {
+  content: '🚩'; position: absolute; top: -4px; right: -4px;
+  font-size: 10px; line-height: 1;
+}
+/* 当前题高亮 */
+.ac-cell.current { box-shadow: 0 0 0 3px #fbbf24; }
+.ac-actions {
+  display: flex; justify-content: space-between; gap: 12px;
+  padding: 16px 20px; border-top: 1px solid #e2e8f0;
+}
+.ac-actions .btn-primary { flex: 2; }
+
+@media (prefers-color-scheme: dark) {
+  .ac-panel { background: #1e293b; }
+  .ac-title { color: #f1f5f9; }
+  .ac-close { color: #64748b; }
+  .ac-close:hover { background: #334155; color: #94a3b8; }
+  .ac-stats { border-color: #334155; color: #94a3b8; }
+  .ac-grid { border-color: #334155; }
+  .ac-cell { background: #0f172a; border-color: #334155; color: #64748b; }
+  .ac-cell:hover { border-color: #3b82f6; }
+  .ac-cell.answered { background: #2563eb; border-color: #2563eb; color: #fff; }
+  .ac-cell.unanswered { background: #1e293b; border-color: #334155; color: #475569; }
+  .ac-actions { border-color: #334155; }
+}
+
+/* ===================== 模考库（粉笔同源复刻 · 独立栏目） ===================== */
+.mk-head { padding: 16px 16px 2px; }
+.mk-title { font-size: 20px; font-weight: 800; color: var(--text); }
+.mk-sub { font-size: 12px; color: var(--text-3); margin-top: 5px; line-height: 1.5; }
+
+.mk-tabs { display: flex; gap: 8px; padding: 12px 16px; overflow-x: auto; }
+.mk-tab {
+  flex: 1; min-width: 92px;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 12px; border-radius: 12px;
+  background: var(--card); border: 1px solid var(--border);
+  color: var(--text-2); font-size: 14px; font-weight: 600; cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: all .15s;
+  white-space: nowrap;
+}
+.mk-tab.active { background: #5b6cff; border-color: #5b6cff; color: #fff; }
+.mk-tab-n {
+  font-size: 11px; padding: 1px 7px; border-radius: 10px;
+  background: rgba(91,108,255,.12); color: #5b6cff;
+}
+.mk-tab.active .mk-tab-n { background: rgba(255,255,255,.22); color: #fff; }
+
+.mk-year { padding: 14px 16px 6px; font-size: 15px; font-weight: 700; color: var(--text); }
+.mk-cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 4px 16px 24px; }
+.mk-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+  padding: 14px; box-shadow: var(--shadow);
+  transition: box-shadow .15s, transform .12s;
+  display: flex; flex-direction: column;
+}
+.mk-card:active { transform: scale(.98); }
+.mk-card:hover { box-shadow: 0 6px 18px rgba(91,108,255,.14); }
+.mk-card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.mk-tag { font-size: 11px; padding: 2px 9px; border-radius: 10px; background: #5b6cff; color: #fff; }
+.mk-year-sm { font-size: 13px; font-weight: 600; color: var(--text); }
+.mk-name { font-size: 14px; color: var(--text); line-height: 1.45; min-height: 40px; flex: 1; }
+.mk-meta { font-size: 12px; color: var(--text-3); margin: 8px 0 12px; }
+.mk-start {
+  width: 100%; padding: 10px; border: none; border-radius: 10px;
+  background: #5b6cff; color: #fff; font-size: 14px; font-weight: 700; cursor: pointer;
+  transition: background .15s;
+}
+.mk-start:hover { background: #4a5be0; }
+.mk-empty { text-align: center; color: var(--text-3); font-size: 14px; padding: 40px 16px; }
+
+@media (prefers-color-scheme: dark) {
+  .mk-tab { background: #1c1f29; }
+  .mk-card { background: #1c1f29; }
+  .mk-tab-n { background: rgba(91,108,255,.22); }
+  .mk-start:hover { background: #6b7bff; }
 }

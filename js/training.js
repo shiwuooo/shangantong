@@ -29,6 +29,9 @@
   var S = null;      // window.SAT.state 引用
   var session = null;
   var qTimerId = null;
+  var trPad = null;        // 共享 Scratchpad 实例
+  var trCurQid = null;     // 当前题 qid（草稿按题持久化）
+  var trDraftOverlay = null;
 
   // ---------- 基础工具 ----------
   function el(tag, attrs, text) {
@@ -57,7 +60,19 @@
   // 优先渲染带图 HTML（materialHtml/qHtml/optionsHtml/explainHtml），否则转义纯文本
   // 与练习/模考模式共用同一套规则，保证资料分析/图形推理图题在训练里也能出图
   function richText(html, text) {
-    if (html && /<img|<p|<div|<span|<br|<table|<ol|<ul/i.test(html)) return html;
+    if (html && /<img|<p|<div|<span|<br|<table|<ol|<ul/i.test(html)) {
+      return html.replace(/<img([^>]*)>/gi, function (match, attrs) {
+        if (attrs.indexOf('onerror') !== -1) return match;
+        var cleanAttrs = attrs
+          .replace(/\s*width="\d+px"/gi, function (m) { return m.replace('px', ''); })
+          .replace(/\s*height="\d+px"/gi, function (m) { return m.replace('px', ''); });
+        // onerror 属性用双引号界定，内部 JS 必须用单引号
+        return '<img' + cleanAttrs +
+          ' onload="this.dataset.loaded=1"' +
+          " onerror=\"this.style.display='none';var e=document.createElement('div');e.style.cssText='color:#e23b3b;font-size:12px;padding:8px;border:1px dashed #e23b3b;border-radius:6px;margin:4px 0;background:#fef2f2';e.innerHTML='<b>⚠ 图片加载失败</b><br><small style=color:#666>路径: '+this.src+'</small>';this.parentNode.insertBefore(e,this.nextSibling);this.dataset.loaded=0\">" +
+          '>';
+      });
+    }
     return esc(text == null ? '' : text);
   }
   // 单个选项：优先图片版 optionsHtml[i]（图形推理选项图），否则转义文本
@@ -65,6 +80,26 @@
     var oh = (q.optionsHtml && q.optionsHtml[i]) || '';
     if (oh && /<img|<p|<div|<span|<br/i.test(oh)) return oh;
     return esc(q.options[i] == null ? '' : q.options[i]);
+  }
+  // 图片渲染后强制可见 + 失败兜底（与练习/模考一致）
+  function revealImages(root) {
+    setTimeout(function () {
+      var imgs = root.querySelectorAll('img');
+      for (var i = 0; i < imgs.length; i++) {
+        var img = imgs[i];
+        img.style.cssText += ';display:inline-block!important;visibility:visible!important;opacity:1!important;max-width:100%!important;height:auto!important;';
+        if (img.naturalWidth === 0 && img.dataset.loaded !== '1' && img.dataset.loaded !== '0') {
+          if (!img.dataset.errShown) {
+            img.dataset.errShown = '1';
+            img.style.display = 'none';
+            var e = document.createElement('div');
+            e.style.cssText = 'color:#e23b3b;font-size:12px;padding:8px;border:1px dashed #e23b3b;border-radius:6px;margin:4px 0;background:#fef2f2';
+            e.innerHTML = '<b>⚠ 图片加载失败</b><br><small style="color:#666">路径: ' + (img.getAttribute('src') || '') + '</small>';
+            if (img.parentNode) img.parentNode.insertBefore(e, img.nextSibling);
+          }
+        }
+      }
+    }, 100);
   }
   function fmtSec(s) {
     s = Math.max(0, Math.floor(s));
@@ -90,6 +125,48 @@
     } catch (e) {}
   }
   function clearTimer() { if (qTimerId) { clearInterval(qTimerId); qTimerId = null; } }
+
+  // ---------- 训练草稿板（共享 Scratchpad：电容笔压感 + 手掌防误触） ----------
+  function ensureTrDraftOverlay() {
+    if (trDraftOverlay) return;
+    var ov = el('div', { class: 'draft-overlay hidden', id: 'trDraftOverlay' });
+    ov.innerHTML = ''
+      + '<div class="draft-bar"><span class="draft-title">✏️ 草稿板</span><div class="draft-tools">'
+      + '<button class="draft-tool-btn" id="trDraftPen" title="画笔">✏️ 画笔</button>'
+      + '<button class="draft-tool-btn" id="trDraftEraser" title="橡皮">🧹 橡皮</button>'
+      + '<button class="draft-tool-btn" id="trDraftUndo" title="撤销">↩ 撤销</button>'
+      + '<button class="draft-tool-btn" id="trDraftClear" title="清空">🗑️ 清空</button>'
+      + '<button class="draft-tool-btn primary" id="trDraftClose" title="关闭">✕ 关闭</button>'
+      + '</div></div><canvas id="trDraftCanvas"></canvas>';
+    document.body.appendChild(ov);
+    trDraftOverlay = ov;
+    trPad = new Scratchpad(document.getElementById('trDraftCanvas'), {
+      key: function () { return trCurQid ? 'draft_training_' + trCurQid : null; },
+      penWidth: 3, eraserWidth: 28
+    });
+    var pen = document.getElementById('trDraftPen');
+    var er = document.getElementById('trDraftEraser');
+    if (pen) { pen.classList.add('active'); pen.onclick = function () { trPad.setTool('pen'); pen.classList.add('active'); if (er) er.classList.remove('active'); }; }
+    if (er) er.onclick = function () { trPad.setTool('eraser'); er.classList.add('active'); if (pen) pen.classList.remove('active'); };
+    var undo = document.getElementById('trDraftUndo'); if (undo) undo.onclick = function () { trPad.undo(); };
+    var clr = document.getElementById('trDraftClear'); if (clr) clr.onclick = function () { trPad.clear(); };
+    var close = document.getElementById('trDraftClose'); if (close) close.onclick = closeTrDraft;
+  }
+  function openTrDraft() {
+    ensureTrDraftOverlay();
+    if (trDraftOverlay) trDraftOverlay.classList.remove('hidden');
+    requestAnimationFrame(function () { if (trPad) trPad.resize(); });
+  }
+  function closeTrDraft() { if (trDraftOverlay) trDraftOverlay.classList.add('hidden'); }
+  function toggleTrDraft() {
+    if (trDraftOverlay && !trDraftOverlay.classList.contains('hidden')) closeTrDraft();
+    else openTrDraft();
+  }
+  function trDraftBtn() {
+    var b = el('button', { class: 'btn-ghost', id: 'trDraftBtn' }, '✏️ 草稿');
+    b.onclick = toggleTrDraft;
+    return b;
+  }
 
   // ---------- SAT / 知识点树 安全封装 ----------
   function qById(id) {
@@ -376,6 +453,7 @@
   function renderQuestion() {
     var item = session.queue[session.idx];
     var q = item.q;
+    trCurQid = item.qid;
     var noOpt = !q.options || !q.options.length;
     var meta = SRC_META[item.source] || SRC_META.mistake;
 
@@ -433,6 +511,7 @@
     var submitBtn = el('button', { class: 'btn-primary tr-submit' }, '提交');
     submitBtn.onclick = function () { submitAnswer(card, opts, ansBox, submitBtn, actions); };
     actions.appendChild(submitBtn);
+    actions.appendChild(trDraftBtn());
     card.appendChild(actions);
 
     // 启动逐题计时
@@ -444,6 +523,7 @@
       timer.textContent = fmtSec((Date.now() - session.qStart) / 1000);
     }, 500);
 
+    revealImages(card);
     return card;
   }
 
@@ -511,6 +591,7 @@
     actions.appendChild(nextBtn);
     actions.appendChild(masterBtn);
     actions.appendChild(exitBtn);
+    actions.appendChild(trDraftBtn());
 
     toast(noOpt ? '已展示参考要点' : (isCorrect ? '✅ 答对了' : '❌ 答错了，已进错题本'));
   }
