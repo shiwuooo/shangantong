@@ -1056,11 +1056,20 @@
 }
 .ac-stat { font-weight: 600; }
 .ac-stat .num { color: #2563eb; font-weight: 700; }
+.ac-stat .num.correct-num { color: #16a34a; }
 .ac-grid {
-  flex: 1; overflow-y: auto; padding: 16px 20px;
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
-  gap: 8px; align-content: start;
+  flex: 1; overflow-y: auto; padding: 14px 20px;
+  display: flex; flex-direction: column; gap: 10px; align-content: start;
 }
+/* 模块分组标题（粉笔式） */
+.ac-group-head {
+  font-size: 13px; font-weight: 600; color: #64748b;
+  padding: 4px 0 2px; border-bottom: 1px solid #f1f5f9;
+  margin-bottom: 4px; letter-spacing: 0.5px;
+}
+/* 格子行内排列（每组分一个小网格） */
+.ac-grid > .ac-cell { display: inline-flex; }
+.ac-grid { display: block !important; } /* 覆盖旧 grid 布局 */
 .ac-cell {
   aspect-ratio: 1; border-radius: 10px; display: flex; align-items: center;
   justify-content: center; font-size: 14px; font-weight: 600; cursor: pointer;
@@ -1070,6 +1079,10 @@
 .ac-cell:hover { border-color: #93c5fd; transform: scale(1.08); }
 /* 已答 */
 .ac-cell.answered { background: #2563eb; border-color: #2563eb; color: #fff; }
+/* 正确（交卷后） */
+.ac-cell.correct { background: #16a34a; border-color: #16a34a; color: #fff; }
+/* 错误（交卷后） */
+.ac-cell.wrong { background: #dc2626; border-color: #dc2626; color: #fff; }
 /* 未答 */
 .ac-cell.unanswered { background: #f8fafc; border-color: #e2e8f0; color: #94a3b8; }
 /* 标记 */
@@ -1096,7 +1109,10 @@
   .ac-cell { background: #0f172a; border-color: #334155; color: #64748b; }
   .ac-cell:hover { border-color: #3b82f6; }
   .ac-cell.answered { background: #2563eb; border-color: #2563eb; color: #fff; }
+  .ac-cell.correct { background: #16a34a; border-color: #16a34a; color: #fff; }
+  .ac-cell.wrong { background: #dc2626; border-color: #dc2626; color: #fff; }
   .ac-cell.unanswered { background: #1e293b; border-color: #334155; color: #475569; }
+  .ac-group-head { color: #94a3b8; border-color: #334155; }
   .ac-actions { border-color: #334155; }
 }
 

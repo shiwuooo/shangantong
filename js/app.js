@@ -29,6 +29,7 @@
   let practiceQStart = 0;
   let practiceGuess = false;
   let qTimerId = null;
+  var practiceQElapsed = {};   // qid → 累计秒数（切题时不丢失，对齐粉笔）
   const examStartMap = {};   // qid -> 开始时间戳
   let examGuess = false;
 
@@ -73,6 +74,7 @@
         checked: practiceChecked,
         marked: practiceMarked,
         revealed: window.practiceRevealed || {},
+        qElapsed: practiceQElapsed,          // 累积计时（切题不丢）
         config: {
           timed: window._spTimed,
           showAnswer: window._spShowAnswer,
@@ -121,6 +123,7 @@
     practiceChecked = sess.checked || {};
     practiceMarked = sess.marked || {};
     window.practiceRevealed = sess.revealed || {};
+    practiceQElapsed = sess.qElapsed || {};   // 恢复累积计时
     window._spTimed = sess.config && sess.config.timed !== false;
     window._spShowAnswer = !!(sess.config && sess.config.showAnswer);
     if (sess.config && sess.config.module) currentModule = sess.config.module;
@@ -190,14 +193,37 @@
     t._timer = setTimeout(() => t.classList.remove('show'), ms);
   }
 
-  // 逐题实时计时（练习模式）
+  // 逐题实时计时（练习模式 · 累积式：切题不重置，对齐粉笔）
+  function saveCurrentQElapsed() {
+    // 把当前题已花时间存入累积 map
+    if (practiceQStart && practiceList.length > 0) {
+      const q = practiceList[practiceIdx];
+      if (q) {
+        const added = Math.floor((Date.now() - practiceQStart) / 1000);
+        if (added > 0) {
+          practiceQElapsed[q.id] = (practiceQElapsed[q.id] || 0) + added;
+        }
+      }
+    }
+  }
+  function getQElapsed(qid) {
+    // 返回某题累积秒数 + 本次停留增量
+    var base = practiceQElapsed[qid] || 0;
+    if (practiceQStart) base += Math.floor((Date.now() - practiceQStart) / 1000);
+    return base;
+  }
   function startQTimer() {
     if (qTimerId) clearInterval(qTimerId);
     const el = $('#qTimer');
-    if (el) el.textContent = '00:00';
-    qTimerId = setInterval(() => {
+    const q = practiceList[practiceIdx];
+    // 从累积 map 取底数，显示总用时
+    if (el && q) el.textContent = fmtTime(practiceQElapsed[q.id] || 0);
+    else if (el) el.textContent = '00:00';
+    qTimerId = setInterval(function () {
       if (!practiceQStart) return;
-      const s = Math.floor((Date.now() - practiceQStart) / 1000);
+      const q2 = practiceList[practiceIdx];
+      if (!q2) return;
+      const s = getQElapsed(q2.id);
       if (el) el.textContent = fmtTime(s);
     }, 500);
   }
@@ -819,8 +845,9 @@
     $('#pTotal').textContent = total;
     $('#pBar').style.width = ((practiceIdx + 1) / total * 100) + '%';
 
-    // 逐题计时 / 蒙题标记 重置
-    practiceQStart = Date.now();
+    // 逐题计时 / 蒙题标记（累积式：不重置，对齐粉笔）
+    saveCurrentQElapsed();          // 离开上一题时存入累积
+    practiceQStart = Date.now();    // 新题从现在开始计增量
     practiceGuess = false;
     if (window._spTimed === false) { stopQTimer(); } else { startQTimer(); }
     const gb = $('#guessBtn');
@@ -998,7 +1025,7 @@
     const correct = q.answer;
     const isCorrect = ans === correct;
     const module = q._module || findModuleOf(q);
-    const ms = practiceQStart ? (Date.now() - practiceQStart) : 0;
+    const ms = (getQElapsed(q.id)) * 1000;   // 累积式计时（含历史停留）
     const code = classify(isCorrect, practiceGuess, ms, module);
     State.history.push({ id: q.id, module, correct: isCorrect, ts: Date.now() });
     State.attempts.push({ id: q.id, module, selected: ans, correct: isCorrect, ms, guess: practiceGuess, code, ts: Date.now(), paper: null });
@@ -1047,7 +1074,7 @@
     const correct = q.answer;
     const isCorrect = ans === correct;
     const module = q._module || findModuleOf(q);
-    const ms = practiceQStart ? (Date.now() - practiceQStart) : 0;
+    const ms = (getQElapsed(q.id)) * 1000;   // 累积式计时（含历史停留）
 
     // 如果还没记录过（用户手动点"查看答案"但还没自动提交过），则记录
     const alreadyRecorded = State.attempts.some(a => a.id === q.id);
@@ -1084,6 +1111,7 @@
 
   function nextQuestion() {
     if (_autoAdvanceTimer) { clearTimeout(_autoAdvanceTimer); _autoAdvanceTimer = null; }
+    saveCurrentQElapsed();
     if (practiceIdx < practiceList.length - 1) {
       practiceIdx++;
       savePracticeSession();
@@ -1095,6 +1123,7 @@
 
   function prevQuestion() {
     if (_autoAdvanceTimer) { clearTimeout(_autoAdvanceTimer); _autoAdvanceTimer = null; }
+    saveCurrentQElapsed();
     if (practiceIdx > 0) {
       practiceIdx--;
       savePracticeSession();
@@ -1202,29 +1231,83 @@
     const stats = $('#acStats');
     if (!grid || !stats) return;
     grid.innerHTML = '';
-    let answered = 0, unanswered = 0, marked = 0;
-    practiceList.forEach((q, idx) => {
-      const cell = document.createElement('div');
-      cell.className = 'ac-cell';
-      cell.textContent = idx + 1;
-      const isAnswered = practiceChecked[q.id];
-      const isMarked = practiceMarked && practiceMarked[q.id];
-      if (isAnswered) { cell.classList.add('answered'); answered++; }
-      else { cell.classList.add('unanswered'); unanswered++; }
-      if (isMarked) { cell.classList.add('marked'); marked++; }
-      if (idx === practiceIdx) cell.classList.add('current');
-      cell.onclick = () => {
-        hideAnswerCard();
-        practiceIdx = idx;
-        showQuestion();
-      };
-      grid.appendChild(cell);
+    let answered = 0, unanswered = 0, marked = 0, correctCnt = 0;
+    const isPostSubmit = practiceSubmitted;
+
+    // 按模块分组（对齐粉笔答题卡）
+    const groups = {};
+    const order = ['panduan','yanyu','shuliang','ziliao','changshi'];
+    practiceList.forEach(function(q, idx) {
+      var mod = q._module || findModuleOf(q) || 'other';
+      if (!groups[mod]) groups[mod] = [];
+      groups[mod].push({ q: q, idx: idx });
+    });
+
+    // 模块显示名
+    const modNames = { panduan:'判断推理', yanyu:'言语理解', shuliang:'数量关系', ziliao:'资料分析', changshi:'常识判断', other:'其他', shenlun:'申论' };
+
+    // 按固定顺序输出分组
+    order.forEach(function(mod) {
+      if (!groups[mod] || !groups[mod].length) return;
+      renderAcGroup(grid, mod, modNames[mod] || mod, groups[mod], isPostSubmit);
+    });
+    // 剩余模块
+    Object.keys(groups).forEach(function(mod) {
+      if (order.indexOf(mod) >= 0) return;
+      renderAcGroup(grid, mod, modNames[mod] || mod, groups[mod], isPostSubmit);
+    });
+
+    // 统计
+    practiceList.forEach(function(q) {
+      if (practiceChecked[q.id]) { answered++; if (practiceAnswers[q.id] === q.answer) correctCnt++; }
+      else unanswered++;
+      if (practiceMarked && practiceMarked[q.id]) marked++;
     });
     stats.innerHTML =
       '<span class="ac-stat">已答 <span class="num">' + answered + '</span></span>' +
       '<span class="ac-stat">未答 <span class="num">' + unanswered + '</span></span>' +
       (marked > 0 ? '<span class="ac-stat">标记 <span class="num">' + marked + '</span></span>' : '') +
+      (isPostSubmit && answered > 0 ? '<span class="ac-stat">正确 <span class="num correct-num">' + correctCnt + '</span></span>' : '') +
       '<span class="ac-stat">共 <span class="num">' + practiceList.length + '</span> 题</span>';
+  }
+
+  // 渲染答题卡的一个模块分组
+  function renderAcGroup(container, modKey, modName, items, isPostSubmit) {
+    // 分组标题
+    var header = document.createElement('div');
+    header.className = 'ac-group-head';
+    header.textContent = modName;
+    container.appendChild(header);
+
+    // 该分组的格子
+    items.forEach(function(item) {
+      var q = item.q, idx = item.idx;
+      var cell = document.createElement('div');
+      cell.className = 'ac-cell';
+      cell.textContent = idx + 1;
+      var isAnswered = practiceChecked[q.id];
+      var isMarked = practiceMarked && practiceMarked[q.id];
+
+      if (isPostSubmit && isAnswered) {
+        // 交卷后：正确绿色 / 错误红色
+        var ans = practiceAnswers[q.id];
+        if (ans !== undefined && ans === q.answer) { cell.classList.add('correct'); }
+        else { cell.classList.add('wrong'); }
+      } else if (isAnswered) {
+        cell.classList.add('answered');
+      } else {
+        cell.classList.add('unanswered');
+      }
+      if (isMarked) cell.classList.add('marked');
+      if (idx === practiceIdx) cell.classList.add('current');
+
+      cell.onclick = function () {
+        hideAnswerCard();
+        practiceIdx = idx;
+        showQuestion();
+      };
+      container.appendChild(cell);
+    });
   }
 
   function confirmSubmit() {
@@ -3273,6 +3356,19 @@
     saveState();
     const h = (location.hash || '').slice(1).split('?')[0] || 'home';
     showPage(h);
+    // 倒计时走钟（每秒刷新，不仅首页——任何页面都保持倒计时准确）
+    (function tick() {
+      const target = nextExamDate();
+      const now = new Date();
+      const diff = Math.max(0, Math.floor((target - now) / 1000));
+      const d = Math.floor(diff / 86400);
+      const hh = Math.floor((diff % 86400) / 3600);
+      const mm = Math.floor((diff % 3600) / 60);
+      const ss = diff % 60;
+      const el = $('#countdown');
+      if (el) el.textContent = d + '天 ' + String(hh).padStart(2,'0') + ':' + String(mm).padStart(2,'0') + ':' + String(ss).padStart(2,'0');
+      setTimeout(tick, 1000);
+    })();
     // 每日一思
     const quotes = [
       '今日一思：把每一道错题当作必考点。',
