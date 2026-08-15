@@ -1168,3 +1168,52 @@
   .mk-tab-n { background: rgba(91,108,255,.22); }
   .mk-start:hover { background: #6b7bff; }
 }
+
+/* ===========================
+   合并页分段 Tab（方法库 / 数据中心 / 错题复习 / 套卷模式）
+   =========================== */
+.seg-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px 4px;
+  flex-wrap: wrap;
+}
+.seg-tab {
+  flex: 1 1 auto;
+  min-width: 64px;
+  padding: 9px 12px;
+  border: none;
+  border-radius: 10px;
+  background: #eef0f6;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.seg-tab.active {
+  background: #5b6cff;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(91,108,255,.28);
+}
+.seg-panel.hidden { display: none !important; }
+.seg-panel { padding: 0 0 16px; }
+/* 模考计时条 */
+.exam-timer-bar {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0 2px;
+}
+.exam-timer-bar .timer {
+  font-size: 20px;
+  font-weight: 800;
+  color: #5b6cff;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .5px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .seg-tab { background: #232733; color: #9aa4b8; }
+  .seg-tab.active { background: #5b6cff; color: #fff; }
+  .exam-timer-bar .timer { color: #8b9bff; }
+}

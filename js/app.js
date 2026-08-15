@@ -232,31 +232,62 @@
   // ===========================
   // 页面路由
   // ===========================
-  function showPage(name) {
+  // 解析 #page&k=v&k2=v2 形式的哈希参数
+  function parseHash() {
+    var raw = (location.hash || '').replace(/^#/, '');
+    var parts = raw.split(/[?&]/);
+    var name = parts[0] || 'home';
+    var params = {};
+    for (var i = 1; i < parts.length; i++) {
+      var eq = parts[i].indexOf('=');
+      var k = eq === -1 ? parts[i] : parts[i].slice(0, eq);
+      var v = eq === -1 ? '' : parts[i].slice(eq + 1);
+      if (k) params[decodeURIComponent(k)] = decodeURIComponent(v);
+    }
+    return { name: name || 'home', params: params };
+  }
+
+  // 合并后的规范页切换内部子视图（Tab / 模式）
+  function switchSegInPage(pageEl, tab) {
+    if (!pageEl) return;
+    pageEl.querySelectorAll('.seg-tab').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-tab') === tab || b.getAttribute('data-mode') === tab);
+    });
+    pageEl.querySelectorAll('.seg-panel').forEach(function (p) {
+      p.classList.toggle('hidden', p.getAttribute('data-panel') !== tab);
+    });
+  }
+
+  function showPage(name, params) {
+    if (!name) { var ph = parseHash(); name = ph.name; params = ph.params; }
+    params = params || {};
+    // 旧深链别名 → 合并后的规范页 + 子视图参数（保证历史链接/书签不失效）
+    if (name === 'exam') { name = 'papers'; params.mode = params.mode || 'exam'; }
+    else if (name === 'modules') { name = 'special'; }
+    else if (name === 'speed') { name = 'method'; params.tab = params.tab || 'speed'; }
+    else if (name === 'tips') { name = 'method'; params.tab = params.tab || 'tips'; }
+    else if (name === 'dashboard') { name = 'stats'; params.tab = params.tab || 'dashboard'; }
+    else if (name === 'diagnosis') { name = 'stats'; params.tab = params.tab || 'diagnosis'; }
+    else if (name === 'coach') { name = 'stats'; params.tab = params.tab || 'coach'; }
+    else if (name === 'training') { name = 'mistakes'; params.tab = params.tab || 'training'; }
+
     name = String(name || 'home').split(/[?&#]/)[0];
     if (!/^[a-zA-Z-]+$/.test(name) || !document.getElementById('page-' + name)) name = 'home';
-    $$('.page').forEach(p => p.classList.add('hidden'));
-    const target = $('#page-' + name);
+
+    $$('.page').forEach(function (p) { p.classList.add('hidden'); });
+    var target = $('#page-' + name);
     if (target) target.classList.remove('hidden');
-    $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.go === name));
+    $$('.tab').forEach(function (t) { t.classList.toggle('active', t.dataset.go === name); });
 
     if (name === 'home') renderHome();
     if (name === 'practice') renderPractice();
-    if (name === 'exam') renderExamIntro();
+    if (name === 'papers') renderPapers(params);
     if (name === 'mock') renderMock();
-    if (name === 'papers') renderPapers();
-    if (name === 'mistakes') renderMistakes();
+    if (name === 'mistakes') renderMistakes(params);
     if (name === 'favorites') renderFavorites();
-    if (name === 'stats') renderStats();
-    if (name === 'method') renderMethod();
-    if (name === 'speed') renderSpeed();
+    if (name === 'stats') renderStats(params);
+    if (name === 'method') renderMethod(params);
     if (name === 'freq') renderFreq();
-    if (name === 'tips') renderTips();
-    if (name === 'dashboard') renderDashboard();
-    if (name === 'diagnosis') renderDiagnosis();
-    if (name === 'training') renderTraining();
-    if (name === 'coach') renderCoach();
-    if (name === 'modules') renderModules();
     if (name === 'special') { if (window.renderSpecial) window.renderSpecial(); }
     if (name === 'tactics') renderTactics();
     if (name === 'experience') renderExperience();
@@ -1533,9 +1564,38 @@
   var paperViewIdx = 0;
   var paperViewChecked = {};
 
-  function renderPapers() {
-    buildPaperFilters();
-    renderPaperList();
+  // 套卷页：真题套卷库（不限时）与限时模考共用一套 DOM，靠模式切换
+  function setPapersMode(mode) {
+    var papersList = $('#papersList');
+    var paperView = $('#paperView');
+    var examIntro = $('#examIntro');
+    var examBody = $('#examBody');
+    var examResult = $('#examResult');
+    var tabs = $('#papersModeTabs');
+    if (tabs) tabs.querySelectorAll('.seg-tab').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-mode') === mode);
+    });
+    if (mode === 'exam') {
+      if (papersList) papersList.classList.add('hidden');
+      if (paperView) paperView.classList.add('hidden');
+      if (examResult) examResult.classList.add('hidden');
+      if (examBody) examBody.classList.add('hidden');
+      if (examIntro) examIntro.classList.remove('hidden');
+      renderExamIntro();
+    } else {
+      if (examIntro) examIntro.classList.add('hidden');
+      if (examBody) examBody.classList.add('hidden');
+      if (examResult) examResult.classList.add('hidden');
+      if (paperView) paperView.classList.add('hidden');
+      if (papersList) papersList.classList.remove('hidden');
+      buildPaperFilters();
+      renderPaperList();
+    }
+  }
+
+  function renderPapers(params) {
+    params = params || {};
+    setPapersMode(params.mode === 'exam' ? 'exam' : 'papers');
   }
 
   function buildPaperFilters() {
@@ -2370,43 +2430,47 @@
     return null;
   }
 
-  function renderMistakes() {
+  function renderMistakes(params) {
+    params = params || {};
     const list = $('#mistakeList');
     const empty = $('#emptyMistakes');
-    list.innerHTML = '';
+    if (list) list.innerHTML = '';
     if (!State.mistakes.length) {
-      empty.classList.remove('hidden');
-      return;
+      if (empty) empty.classList.remove('hidden');
+    } else {
+      if (empty) empty.classList.add('hidden');
+      State.mistakes.forEach(id => {
+        const q = findQuestion(id);
+        if (!q) return;
+        const card = document.createElement('div');
+        card.className = 'list-card';
+        card.innerHTML = `
+          <div class="lc-stem">${richText(q.qHtml, q.q)}</div>
+          <div class="lc-meta">
+            <span>${({changshi:'常识',yanyu:'言语',shuliang:'数量',panduan:'判断',ziliao:'资料',shenlun:'申论'})[q._module] || ''}</span>
+            <span>${(q.options[q.answer] || '').slice(0, 20)}</span>
+          </div>
+          <div class="lc-actions">
+            <button class="btn-ghost small" data-act="redo">重做</button>
+            <button class="btn-ghost small" data-act="remove">移出</button>
+          </div>
+        `;
+        card.querySelector('[data-act=redo]').onclick = () => {
+          pendingSingle = q;
+          showPage('practice');
+        };
+        card.querySelector('[data-act=remove]').onclick = () => {
+          State.mistakes = State.mistakes.filter(x => x !== id);
+          saveState();
+          renderMistakes();
+          renderHome();
+        };
+        list.appendChild(card);
+      });
     }
-    empty.classList.add('hidden');
-    State.mistakes.forEach(id => {
-      const q = findQuestion(id);
-      if (!q) return;
-      const card = document.createElement('div');
-      card.className = 'list-card';
-      card.innerHTML = `
-        <div class="lc-stem">${richText(q.qHtml, q.q)}</div>
-        <div class="lc-meta">
-          <span>${({changshi:'常识',yanyu:'言语',shuliang:'数量',panduan:'判断',ziliao:'资料',shenlun:'申论'})[q._module] || ''}</span>
-          <span>${(q.options[q.answer] || '').slice(0, 20)}</span>
-        </div>
-        <div class="lc-actions">
-          <button class="btn-ghost small" data-act="redo">重做</button>
-          <button class="btn-ghost small" data-act="remove">移出</button>
-        </div>
-      `;
-      card.querySelector('[data-act=redo]').onclick = () => {
-        pendingSingle = q;
-        showPage('practice');
-      };
-      card.querySelector('[data-act=remove]').onclick = () => {
-        State.mistakes = State.mistakes.filter(x => x !== id);
-        saveState();
-        renderMistakes();
-        renderHome();
-      };
-      list.appendChild(card);
-    });
+    // 错题 · 复习：同时挂载智能复习，并按参数切换子视图
+    mountTraining();
+    switchSegInPage($('#page-mistakes'), params.tab || 'mistakes');
   }
 
   function renderFavorites() {
@@ -2451,7 +2515,8 @@
   // ===========================
   // 统计
   // ===========================
-  function renderStats() {
+  function renderStats(params) {
+    params = params || {};
     const total = State.history.length;
     const correct = State.history.filter(h => h.correct).length;
     const acc = total ? Math.round(correct / total * 100) : 0;
@@ -2522,6 +2587,9 @@
     });
 
     renderCoverage();
+    // 数据中心：同时挂载看板 / 诊断 / 教练，并按参数切换子视图
+    mountDashboard(); mountDiagnosis(); mountCoach();
+    switchSegInPage($('#page-stats'), params.tab || 'stats');
   }
 
   // 题库覆盖：按考试类型统计年份跨度与真题/高仿真数量
@@ -2605,11 +2673,11 @@
   // ===========================
   // 新增模块页面（方法库 / 速算 / 考频）
   // ===========================
-  function renderMethod() {
+  function mountMethodLib() {
     const el = $('#methodRoot');
     if (el && window.MethodLib) window.MethodLib.mount(el);
   }
-  function renderSpeed() {
+  function mountSpeedLib() {
     const el = $('#speedRoot');
     if (el && window.SpeedDrill) window.SpeedDrill.mount(el);
     else if (el) el.innerHTML = '<div class="empty card">速算模块加载中…</div>';
@@ -2620,30 +2688,36 @@
     if (el && window.FreqHeatmap) window.FreqHeatmap.mount(el);
     else if (el) el.innerHTML = '<div class="empty card">考频模块加载中…</div>';
   }
-  function renderTips() {
+  function mountTipsLib() {
     const el = $('#tipsRoot');
     if (el && window.TipsLib) window.TipsLib.mount(el);
     else if (el) el.innerHTML = '<div class="empty card">技巧库加载中…</div>';
   }
-  function renderDashboard() {
+  function mountDashboard() {
     const el = $('#dashboardRoot');
     if (el && window.Dashboard) window.Dashboard.mount(el);
     else if (el) el.innerHTML = '<div class="empty card">看板加载中…</div>';
   }
-  function renderDiagnosis() {
+  function mountDiagnosis() {
     const el = $('#diagnosisRoot');
     if (el && window.Diagnosis) window.Diagnosis.mount(el);
     else if (el) el.innerHTML = '<div class="empty card">诊断模块加载中…</div>';
   }
-  function renderTraining() {
+  function mountTraining() {
     const el = $('#trainingRoot');
     if (el && window.Training) window.Training.mount(el);
     else if (el) el.innerHTML = '<div class="empty card">训练模块加载中…</div>';
   }
-  function renderCoach() {
+  function mountCoach() {
     const el = $('#coachRoot');
     if (el && window.CoachUI) window.CoachUI.mount(el);
     else if (el) el.innerHTML = '<div class="empty card">教练模块加载中…</div>';
+  }
+  // 方法技巧库（通法 / 速算 / 技巧 合并为一页，内部 Tab 切换）
+  function renderMethod(params) {
+    params = params || {};
+    mountMethodLib(); mountSpeedLib(); mountTipsLib();
+    switchSegInPage($('#page-method'), params.tab || 'method');
   }
   function renderTactics() {
     const el = $('#tacticsRoot');
@@ -2660,165 +2734,6 @@
     const el = $('#searchRoot');
     if (el && window.QSearch) window.QSearch.mount(el);
     else if (el) el.innerHTML = '<div class="empty card">搜题模块加载中…</div>';
-  }
-
-  // ===========================
-  // 行测分板块总览（粉笔式多级分类树）
-  // ===========================
-  // 模块 → 题型(topic) → 细分考点(keypoint) 三级可展开。
-  // - 题型题量取自 KnowledgeTree 推断分布（覆盖全库，真实大题量）
-  // - 细分考点取自 KT_DATA 官方标注（真实小题量，专项精练）
-  // 详见 js/classify-tree.js
-
-  function accClassOf(acc) {
-    if (acc == null) return 'untested';
-    if (acc >= 0.8) return 'easy';
-    if (acc >= 0.6) return 'mid';
-    if (acc >= 0.4) return 'hard';
-    return 'extreme';
-  }
-
-  function toggleBody(container, sel) {
-    if (!container) return;
-    const body = container.querySelector(sel);
-    if (!body) return;
-    if (body.hasAttribute('hidden')) {
-      body.removeAttribute('hidden');
-      container.setAttribute('data-open', '1');
-    } else {
-      body.setAttribute('hidden', '');
-      container.setAttribute('data-open', '0');
-    }
-  }
-
-  function renderModules() {
-    const root = $('#modulesRoot');
-    if (!root) return;
-
-    if (!window.FenbiKP) {
-      root.innerHTML = '<div class="empty card">专项练习模块未加载</div>';
-      return;
-    }
-    if (!window.FenbiKP.ready) {
-      try { window.FenbiKP.build(); }
-      catch (e) { console.error('[专项练习] 构建失败:', e); root.innerHTML = '<div class="empty card">考点树构建失败</div>'; return; }
-    }
-
-    function esc(s) {
-      return String(s).replace(/[&<>"]/g, function (c) {
-        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
-      });
-    }
-    // 掌握度着色：>=80绿 / >=60黄 / >=40橙 / <40红 / 未测灰
-    function mCls(acc, tested) {
-      if (!tested) return 'kt-un';
-      if (acc >= 0.8) return 'kt-easy';
-      if (acc >= 0.6) return 'kt-mid';
-      if (acc >= 0.4) return 'kt-hard';
-      return 'kt-ext';
-    }
-
-    const MOD_ICON = { '政治理论': '🚩', '常识判断': '🌐', '言语理解与表达': '📖', '数量关系': '🧮', '判断推理': '🧩', '资料分析': '📊' };
-
-    // 递归渲染单个节点（pk = pathKey，node = registry 节点）
-    function nodeHtml(pk, node) {
-      const cnt = window.FenbiKP.localCount(pk);
-      const mv = window.FenbiKP.mastery(pk);
-      const tested = !!mv;
-      const acc = mv ? mv.acc : null;
-      const mcls = mCls(acc, tested);
-      const mtxt = tested ? (Math.round(acc * 100) + '%') : '未测';
-      const fbc = node.fbCount || 0;
-      const hasKids = node.childKeys.length > 0;
-      const kidsHtml = hasKids ? node.childKeys.map(function (cpk) {
-        return nodeHtml(cpk, window.FenbiKP.nodeByKey(cpk));
-      }).join('') : '';
-      const goBtn = '<button class="kt-go" data-pk="' + esc(pk) + '">去练习 →</button>';
-      return '<div class="kt-node' + (hasKids ? ' kt-has-kids' : ' kt-leaf') + '" data-open="0">' +
-               '<div class="kt-head' + (hasKids ? ' kt-toggle' : '') + '">' +
-                 (hasKids
-                   ? '<span class="kt-caret">▸</span>'
-                   : '<span class="kt-caret kt-caret-leaf">·</span>') +
-                 '<span class="kt-name">' + esc(node.name) + '</span>' +
-                 (fbc ? '<span class="kt-fb" title="粉笔官方标签题量">粉笔 ' + fbc + '</span>' : '') +
-                 '<span class="kt-count">本地 ' + cnt + '</span>' +
-                 '<span class="kt-acc ' + mcls + '">' + mtxt + '</span>' +
-                 goBtn +
-               '</div>' +
-               (hasKids ? '<div class="kt-children" hidden>' + kidsHtml + '</div>' : '') +
-             '</div>';
-    }
-
-    const order = window.FENBI_INDEX.order;
-    const tree = window.FENBI_TREE;
-    const topByName = {};
-    tree.forEach(function (n) { topByName[n.name] = n; });
-
-    let html = '';
-    order.forEach(function (modName) {
-      const tn = topByName[modName];
-      if (!tn) return;
-      const pk = modName;
-      const node = window.FenbiKP.nodeByKey(pk);
-      const cnt = window.FenbiKP.localCount(pk);
-      const modKey = window.FENBI_INDEX.moduleOf[modName];
-      const acc = window.Difficulty ? window.Difficulty.moduleAccuracy(modKey) : null;
-      const accCls = mCls(acc, acc != null);
-      const accTxt = acc == null ? '未测' : (Math.round(acc * 100) + '%');
-      const icon = MOD_ICON[modName] || '📚';
-      const kidsHtml = node.childKeys.map(function (cpk) {
-        return nodeHtml(cpk, window.FenbiKP.nodeByKey(cpk));
-      }).join('');
-      const modHref = '#practice&module=' + modKey;
-      html += '<section class="card kt-module" data-open="0">' +
-                '<div class="kt-head kt-mod-head kt-toggle">' +
-                  '<span class="kt-caret">▸</span>' +
-                  '<span class="kt-icon">' + icon + '</span>' +
-                  '<span class="kt-name">' + esc(modName) + '</span>' +
-                  '<span class="kt-count">本地 ' + cnt + ' 题</span>' +
-                  '<span class="kt-acc ' + accCls + '">' + accTxt + '</span>' +
-                  '<a class="kt-mod-go" href="' + modHref + '">刷整模块 →</a>' +
-                '</div>' +
-                '<div class="kt-children" hidden>' + kidsHtml + '</div>' +
-              '</section>';
-    });
-
-    root.innerHTML =
-      '<div class="kt-toolbar">' +
-        '<div class="kt-tb-left">' +
-          '<button class="kt-btn" id="ktExpandAll">展开全部</button>' +
-          '<button class="kt-btn" id="ktCollapse">收起</button>' +
-          '<button class="kt-btn kt-btn-weak" id="ktWeak">🎯 薄弱优先·智能推题</button>' +
-        '</div>' +
-        '<div class="kt-legend">' +
-          '<span class="kt-leg"><i class="kt-acc kt-easy"></i>掌握≥80%</span>' +
-          '<span class="kt-leg"><i class="kt-acc kt-mid"></i>60-80%</span>' +
-          '<span class="kt-leg"><i class="kt-acc kt-hard"></i>40-60%</span>' +
-          '<span class="kt-leg"><i class="kt-acc kt-ext"></i>&lt;40%</span>' +
-          '<span class="kt-leg"><i class="kt-acc kt-un"></i>未测</span>' +
-        '</div>' +
-      '</div>' +
-      '<div class="kt-note">本地题量 = 题库中带粉笔官方考点标签、可精确练习的题数（已覆盖 91% 标签题）；粉笔题量 = 粉笔官方标签统计，仅供参考。点击「去练习」即按该考点（含子考点）精准开刷。</div>' +
-      html;
-
-    // 交互（事件委托）
-    root.onclick = function (e) {
-      const go = e.target.closest('.kt-go');
-      if (go) { e.preventDefault(); const pk = go.getAttribute('data-pk'); window.FenbiKP.goPractice(pk); return; }
-      if (e.target.closest('#ktWeak')) { window.FenbiKP.goWeakPractice({ cap: 40, perLeaf: 3, maxLeaves: 60 }); return; }
-      if (e.target.closest('#ktExpandAll')) {
-        root.querySelectorAll('.kt-children').forEach(function (c) { c.removeAttribute('hidden'); });
-        root.querySelectorAll('.kt-node,.kt-module').forEach(function (n) { n.setAttribute('data-open', '1'); });
-        return;
-      }
-      if (e.target.closest('#ktCollapse')) {
-        root.querySelectorAll('.kt-children').forEach(function (c) { c.setAttribute('hidden', ''); });
-        root.querySelectorAll('.kt-node,.kt-module').forEach(function (n) { n.setAttribute('data-open', '0'); });
-        return;
-      }
-      const tgl = e.target.closest('.kt-toggle');
-      if (tgl) { const node = tgl.closest('.kt-node, .kt-module'); if (node) toggleBody(node, '.kt-children'); }
-    };
   }
 
   // ===========================
@@ -3063,6 +2978,19 @@
         if (name) location.hash = '#' + name;
       };
     });
+    // 合并页分段 Tab（方法 / 数据中心 / 错题复习）与套卷模式切换（委托）
+    document.addEventListener('click', function (e) {
+      const tabBtn = e.target.closest && e.target.closest('.seg-tab');
+      if (!tabBtn) return;
+      const page = tabBtn.closest('.page');
+      if (!page) return;
+      const mode = tabBtn.getAttribute('data-mode');
+      if (page.id === 'page-papers' && mode) {
+        setPapersMode(mode);
+      } else {
+        switchSegInPage(page, tabBtn.getAttribute('data-tab'));
+      }
+    });
     $$('[data-back]').forEach(b => {
       b.onclick = () => { location.hash = '#' + b.dataset.back; };
     });
@@ -3270,9 +3198,7 @@
     // hash 路由
     window.addEventListener('hashchange', () => {
       // 兼容 #practice&module=xxx 与 #practice?module=xxx 两种写法
-      const h = (location.hash || '').slice(1).split(/[?&]/)[0];
-      if (h) showPage(h);
-      else showPage('home');
+      showPage();
     });
   }
 
@@ -3354,8 +3280,7 @@
     State.lastVisit = tk;
     if (State.days[tk] === undefined) State.days[tk] = 0;
     saveState();
-    const h = (location.hash || '').slice(1).split('?')[0] || 'home';
-    showPage(h);
+    showPage();
     // 倒计时走钟（每秒刷新，不仅首页——任何页面都保持倒计时准确）
     (function tick() {
       const target = nextExamDate();
