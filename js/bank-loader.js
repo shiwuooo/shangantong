@@ -27,7 +27,9 @@
       count: paper.questions.length,
       year: _fq.year ? Number(_fq.year) : '',
       examType: _fq.exam_type || '',
-      volume: _fq.exam_volume || '行测'
+      volume: _fq.exam_volume || '行测',
+      // 模考卷无标准答案（answer=null），标记后由 App 走"盲练/计时"分支，不污染训练数据
+      noAnswer: !!(paper.noAnswer || _fq.noAnswer)
     });
 
     // 卷型结构表：真题的模块/题型由题号位置决定，这是硬标准，优先于源标签与内容推断
@@ -36,7 +38,9 @@
     if (ST && ST.needMaterial) ST.needMaterial.forEach(function (n) { needMat[n] = 1; });
 
     paper.questions.forEach(function (q, i) {
-      if (!q || !q.q || !Array.isArray(q.options) || typeof q.answer !== 'number') return;
+      // 模考无答案：answer 允许为 null（带 noAnswer 标记），进入题库用于盲练/计时，不参与判分
+      if (!q || !q.q || !Array.isArray(q.options)) return;
+      if (typeof q.answer !== 'number' && !q.noAnswer) return;
       var id = q.id || (paper.id + '-' + (i + 1));
       var no = qNum(id);
 
@@ -60,6 +64,7 @@
         lackMaterial: !q.material && !!needMat[no],
         options: q.options,
         answer: q.answer,
+        noAnswer: !!q.noAnswer,
         explain: q.explain || '',
         year: q.year ? Number(q.year) : '',
         exam_type: q.exam_type || '',
@@ -123,6 +128,7 @@
   }
 
   var files = (Array.isArray(window.BANK_FILES) ? window.BANK_FILES : [])
+    .concat(Array.isArray(window.MOCK_BANK_FILES) ? window.MOCK_BANK_FILES : [])
     .filter(function (f) { return /^[\w.\-]+\.js$/.test(f); });
 
   if (files.length) {

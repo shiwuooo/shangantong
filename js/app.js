@@ -1648,7 +1648,7 @@
     papers.forEach(function (p) {
       var card = document.createElement('div');
       card.className = 'pp-card';
-      var tag = paperCat(p) === 'gk' ? '国考' : '省考';
+      var tag = (p.examType === '国考模考') ? '模考' : (paperCat(p) === 'gk' ? '国考' : '省考');
       card.innerHTML = '<div class="pp-card-top"><span class="pp-tag">' + tag + '</span><span class="pp-year">' + (p.year || '?') + '</span></div>' +
         '<div class="pp-name">' + p.name + '</div>' +
         '<div class="pp-meta">' + p.count + ' 题 · 行测</div>';
@@ -1672,6 +1672,7 @@
   var pvSubmitted = false;     // 是否已交卷（控制答案展示时机）
   var paperViewSelMap = {};    // qid -> number（每题选择的选项索引，回显用）
   var pvResult = null;         // 交卷结果
+  var pvNoAnswer = false;    // 当前卷是否无标准答案（粉笔模考）
   var PV_MOD_ORDER = ['changshi', 'zhengzhi', 'yanyu', 'shuliang', 'panduan', 'ziliao', 'shenlun'];
   function pvModName(mod) {
     return ({ changshi: '常识判断', zhengzhi: '政治理论', yanyu: '言语理解', shuliang: '数量关系', panduan: '判断推理', ziliao: '资料分析', shenlun: '申论' })[mod] || mod;
@@ -1681,6 +1682,7 @@
     paperViewList = getPaperQuestions(paperId);
     if (!paperViewList.length) { toast('该卷暂无题目'); return; }
     paperViewIdx = 0;
+    pvNoAnswer = !!(paperViewList[0] && paperViewList[0].noAnswer);
     paperViewChecked = {};
     paperViewMarked = {};
     pvCorrectMap = {};
@@ -1785,6 +1787,7 @@
       else if(srcLabel.indexOf('高仿真')>=0){qSrcEl.textContent='高仿真练习';qSrcEl.className='q-src sim';}
       else if(srcLabel){qSrcEl.textContent=srcLabel;qSrcEl.className='q-src';}
       else{qSrcEl.textContent='';qSrcEl.className='q-src';}
+      if (q.noAnswer && qSrcEl) { qSrcEl.textContent = (srcLabel || '模考') + ' · 无答案'; qSrcEl.className = 'q-src noans'; }
     }
 
     // 题干
@@ -1850,6 +1853,19 @@
   function markPaperOpt(i) {
     var q=paperViewList[paperViewIdx];
     if(!q)return;
+    // 模考无答案：只记录作答，不判分、不写训练数据（避免污染教练/难度/FSRS）
+    if(q.noAnswer){
+      var ms=Math.max(0,Date.now()-(pvStartMap[q.id]||pvTotalStart));
+      var mod=q._module||findModuleOf(q);
+      pvModTime[mod]=(pvModTime[mod]||0)+ms; // 仍累计模块用时（最有价值）
+      paperViewChecked[q.id]=true;
+      paperViewSelMap[q.id]=i;
+      pvCorrectMap[q.id]=2; // 2=已答但无标准答案
+      renderPvAsSheet();
+      $('#pvAsDone').textContent=Object.keys(paperViewChecked).length;
+      toast('已记录作答（本卷无标准答案）');
+      return;
+    }
     if(paperViewChecked[q.id])return;
 
     // 套卷模式：只记录选择，不暴露答案（交卷后才展示）
@@ -1888,6 +1904,16 @@
   function pvCheck(){
     if(!pvSubmitted){ toast('交卷后才能查看答案'); return; }
     var q=paperViewList[paperViewIdx];if(!q)return;
+    if(q.noAnswer){
+      var ac=$('#pvAnswer'); if(ac) ac.classList.remove('hidden');
+      $('#pvAnsValue').textContent='—';
+      $('#pvAnsTag').textContent='无参考答案';
+      $('#pvAnsTag').className='ans-tag none';
+      $('#pvExplain').innerHTML='本题来自粉笔<b>模考</b>，官方答案需交卷后由粉笔给出，上岸通未采集到标准答案。可对照粉笔 App 核对。';
+      renderPvAsSheet();
+      $('#pvAsDone').textContent=Object.keys(paperViewChecked).length;
+      return;
+    }
     if(!paperViewChecked[q.id]){
       paperViewChecked[q.id]=true;
       var correctIdx=-1;
@@ -2053,23 +2079,29 @@
       var c=pvCorrectMap[q.id];
       if(c===true){right++;answered++;byMod[m].right++;byMod[m].done++;}
       else if(c===false){wrong++;answered++;byMod[m].done++;}
+      else if(c===2){answered++;byMod[m].done++;} // 模考无答案：已答计数
     });
     var total=paperViewList.length;
     var skip=total-answered;
     var acc=answered?Math.round(right/answered*100):0;
     var score=total?Math.round(right/total*100):0;
     var used=Math.floor((Date.now()-pvTotalStart-pvPausedElapsed)/1000);
-    pvResult={right:right,wrong:wrong,skip:skip,total:total,acc:acc,score:score,used:used,byMod:byMod};
-    // 写入该卷历史交卷记录（用于历史对比）
-    var hpid=paperViewList[0]&&paperViewList[0].paperId;
-    if(hpid){
-      try{
-        var hk='pv_history_'+hpid;
-        var hist=JSON.parse(localStorage.getItem(hk)||'[]');
-        if(!Array.isArray(hist))hist=[];
-        hist.push({date:Date.now(),score:score,acc:acc,used:used});
-        localStorage.setItem(hk,JSON.stringify(hist));
-      }catch(e){}
+    if (pvNoAnswer) {
+      // 模考无答案：不估分、不写历史趋势（避免污染"比上次±X分"），仅记录已作答与模块用时
+      pvResult={noAnswer:true, answered:answered, right:0, wrong:0, skip:skip, total:total, acc:0, score:0, used:used, byMod:byMod};
+    } else {
+      pvResult={right:right,wrong:wrong,skip:skip,total:total,acc:acc,score:score,used:used,byMod:byMod};
+      // 写入该卷历史交卷记录（用于历史对比）
+      var hpid=paperViewList[0]&&paperViewList[0].paperId;
+      if(hpid){
+        try{
+          var hk='pv_history_'+hpid;
+          var hist=JSON.parse(localStorage.getItem(hk)||'[]');
+          if(!Array.isArray(hist))hist=[];
+          hist.push({date:Date.now(),score:score,acc:acc,used:used});
+          localStorage.setItem(hk,JSON.stringify(hist));
+        }catch(e){}
+      }
     }
     pvSubmitted = true;
     // 交卷后回到第一题，便于逐题回顾答案与解析
@@ -2116,6 +2148,34 @@
     stopPvTimer();
     var r=pvResult;if(!r)return;
     $('#pvResult').classList.remove('hidden');
+    if (r.noAnswer) {
+      $('#pvScoreNum').textContent='—';
+      $('#pvScoreCorrect').textContent=r.answered;
+      $('#pvScoreTotal').textContent=r.total;
+      $('#pvTotalTime').textContent=fmtTime(r.used);
+      $('#pvRight').textContent=r.answered;
+      $('#pvWrong').textContent='—';
+      $('#pvSkip').textContent=r.skip;
+      $('#pvAcc').textContent='无答案';
+      var names={changshi:'常识',zhengzhi:'政治',yanyu:'言语',shuliang:'数量',panduan:'判断',ziliao:'资料',shenlun:'申论'};
+      $('#pvModBreak').innerHTML='<div class="emb-title">本卷无标准答案</div><div style="font-size:13px;color:#64748b;line-height:1.6;padding:6px 2px">粉笔模考官方答案需交卷后由粉笔给出。上岸通已采集题面，可用于<b>盲练计时</b>；交卷后查看各模块用时，便于查漏提速。</div>';
+      var tArr=PV_MOD_ORDER.filter(function(m){return r.byMod[m]&&r.byMod[m].time>0;})
+        .map(function(m){return{m:m,t:r.byMod[m].time};}).sort(function(a,b){return b.t-a.t;});
+      var maxT=tArr.length?tArr[0].t:1;
+      var tb='<div class="emb-title">各模块用时（总 '+fmtTime(r.used)+'）</div>';
+      tArr.forEach(function(o){
+        var d=r.byMod[o.m];
+        var sec=Math.round(o.t/1000);
+        var avg=d.done?Math.round(sec/d.done):0;
+        var pct=Math.round(o.t/maxT*100);
+        tb+='<div class="emb-row"><span class="emb-mod">'+(names[o.m]||o.m)+'</span>'+
+          '<span class="emb-bar"><span class="emb-fill time" style="width:'+pct+'%"></span></span>'+
+          '<span class="emb-num">'+fmtTime(sec)+' · 均'+avg+'s</span></div>';
+      });
+      $('#pvTimeBreak').innerHTML=tb;
+      $('#pvResult').scrollIntoView({behavior:'smooth',block:'start'});
+      return;
+    }
     $('#pvScoreNum').textContent=r.score;
     $('#pvScoreCorrect').textContent=r.right;
     $('#pvScoreTotal').textContent=r.total;
@@ -2186,6 +2246,7 @@
     var cat = ($('#epCat') && $('#epCat').value) || 'gk';
     var yr = ($('#epYear') && $('#epYear').value) || '';
     var papers = (window.BANK_PAPERS || []).filter(function (p) {
+      if (p.noAnswer) return false; // 模考无答案：不进入限时估分模考
       if (p.volume !== '行测') return false;
       if (cat !== 'all' && paperCat(p) !== cat) return false;
       if (yr && String(p.year) !== yr) return false;

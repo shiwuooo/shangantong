@@ -256,6 +256,7 @@ button { font-family: inherit; cursor: pointer; border: 0; background: transpare
 }
 .ans-tag.correct { background: #d4f7e3; color: #15803d; }
 .ans-tag.wrong { background: #fee2e2; color: #b91c1c; }
+.ans-tag.none { background: #f1f5f9; color: #64748b; }
 .ans-explain { margin-top: 10px; font-size: 13.5px; color: var(--text-2); line-height: 1.7; }
 
 /* 操作 */
@@ -525,6 +526,7 @@ button { font-family: inherit; cursor: pointer; border: 0; background: transpare
 }
 .q-src.real { background: #e7f8ee; color: #1a9c5b; }
 .q-src.sim { background: #eef0f5; color: #6b7180; }
+.q-src.noans { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
 
 /* 题库覆盖 */
 .cov-sub { font-size: 12px; font-weight: 700; color: var(--text-2); margin: 14px 0 8px; }

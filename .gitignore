@@ -8,3 +8,10 @@ import.html
 行测分析.html
 server.py
 启动行测分析.bat
+
+# WorkBuddy 会话隐私（绝不公开）
+.workbuddy/
+
+# 本会话产生的开发/诊断残留（非运行时，不公开）
+/_*
+接手指南_新会话.md
