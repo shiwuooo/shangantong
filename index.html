@@ -644,6 +644,25 @@
             <input type="file" id="importFile" accept="application/json" style="display:none" />
           </div>
         </section>
+        <section class="card">
+          <div class="card-head"><div class="card-title">云同步（GitHub 私有仓库）</div><div class="card-extra">跨设备 · 私密</div></div>
+          <div class="backup-actions" style="flex-direction:column;align-items:stretch;gap:10px">
+            <label class="cs-row">GitHub Token
+              <input type="password" id="csToken" placeholder="粘贴带 repo 权限的私人访问令牌" style="flex:1;min-width:0" />
+            </label>
+            <label class="cs-row">同步仓库名
+              <input type="text" id="csRepo" placeholder="shangantong-sync" style="flex:1;min-width:0" />
+            </label>
+            <div class="cs-status" id="csStatus">未配置</div>
+            <div class="backup-actions">
+              <button class="btn-primary small" id="csSave">保存配置</button>
+              <button class="btn-ghost small" id="csPush">⬆️ 上传到云端</button>
+              <button class="btn-ghost small" id="csPull">⬇️ 从云端恢复</button>
+              <label class="cs-auto"><input type="checkbox" id="csAuto" /> 自动同步</label>
+            </div>
+            <p class="cs-tip">数据存到你自己的 GitHub 私有仓库（首次自动创建），不经过任何第三方。需要一个带 <b>repo</b> 权限的 Token（GitHub→Settings→Developer settings→Personal access tokens）。</p>
+          </div>
+        </section>
       </div>
       <div class="seg-panel hidden" data-panel="dashboard"><div id="dashboardRoot"></div></div>
       <div class="seg-panel hidden" data-panel="diagnosis"><div id="diagnosisRoot"></div></div>
@@ -994,6 +1013,7 @@
   <script src="js/knowledge-tree.js"></script>
   <script src="js/classify-tree.js"></script>
   <script src="js/store.js"></script>
+  <script src="js/cloud-sync.js"></script>
   <script src="js/method-data.js"></script>
   <script src="js/method-lib.js"></script>
   <script src="js/speed-drill.js"></script>
