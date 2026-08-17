@@ -3012,23 +3012,15 @@
     return escapeHTML(text == null ? '' : text);
   }
 
-  // 图片渲染后强制可见 + 失败兜底（不依赖 onerror 事件，更稳）
+  // 图片渲染后强制可见（只在真正加载失败时由 richText 的 onerror 报错，不提前隐藏）
+  // 注意：平板慢网下图片可能 >100ms 才加载完，绝不能因 naturalWidth===0 就隐藏，
+  // 否则会被永久 display:none 导致“一个图都不显示”。
   function revealImages(scopeSel) {
     setTimeout(function () {
       $$(scopeSel + ' img').forEach(function (img) {
         img.style.cssText += ';display:inline-block!important;visibility:visible!important;opacity:1!important;max-width:100%!important;height:auto!important;';
-        if (img.naturalWidth === 0 && img.dataset.loaded !== '1' && img.dataset.loaded !== '0') {
-          if (!img.dataset.errShown) {
-            img.dataset.errShown = '1';
-            img.style.display = 'none';
-            var e = document.createElement('div');
-            e.style.cssText = 'color:#e23b3b;font-size:12px;padding:8px;border:1px dashed #e23b3b;border-radius:6px;margin:4px 0;background:#fef2f2';
-            e.innerHTML = '<b>⚠ 图片加载失败</b><br><small style="color:#666">路径: ' + (img.getAttribute('src') || '') + '</small>';
-            if (img.parentNode) img.parentNode.insertBefore(e, img.nextSibling);
-          }
-        }
       });
-    }, 100);
+    }, 50);
   }
   // 单个选项：优先图片版 optionsHtml[i]，否则转义文本
   function optInner(q, i) {
