@@ -136,15 +136,34 @@
   var _mockCbs = [];
   window.MOCK_BANK_READY = false;
 
-  // 单个分卷：直接下载全文(res.text，兼容性最好)，eval 注册
-  function loadOne(f) {
-    return fetch('bank/' + f)
+  // fetch 带超时（平板弱网下个别请求会无限挂起，必须超时才能继续）
+  function fetchWithTimeout(url, ms) {
+    if (typeof AbortController === 'function') {
+      var ctrl = new AbortController();
+      var t = setTimeout(function () { try { ctrl.abort(); } catch (e) {} }, ms);
+      return fetch(url, { signal: ctrl.signal }).then(function (r) {
+        clearTimeout(t); return r;
+      }, function (err) { clearTimeout(t); throw err; });
+    }
+    return fetch(url); // 极旧内核兜底：不超时
+  }
+
+  // 单个分卷：下载全文(res.text)→eval 注册；超时/失败自动重试，绝不永久卡死
+  function loadOne(f, attempt) {
+    attempt = attempt || 0;
+    var TIMEOUT = 20000, MAX_ATTEMPTS = 3;
+    return fetchWithTimeout('bank/' + f, TIMEOUT)
       .then(function (res) {
         if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + f);
         return res.text();
       })
       .then(function (code) {
         try { (0, eval)(code); } catch (e) { console.error('eval bank file failed:', f, e); }
+      })
+      .catch(function (err) {
+        if (attempt < MAX_ATTEMPTS - 1) return loadOne(f, attempt + 1); // 重试同一文件
+        console.error('分卷最终失败(已跳过):', f, err && err.message);
+        throw err; // 彻底放弃，调用方继续下一个，避免整队卡死
       });
   }
 
@@ -196,7 +215,7 @@
     function mockNext() {
       if (loaded >= mockFiles.length) return;
       var f = mockFiles[loaded++];
-      fetch('bank/' + f)
+      fetchWithTimeout('bank/' + f, 20000)
         .then(function (res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.text(); })
         .then(function (code) {
           window._LOADING_MOCK_BANK = true;
