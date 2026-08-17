@@ -2,7 +2,7 @@
  * 首次加载题库/bank 文件时顺带缓存，之后打开秒开（平板多设备复用友好）
  * 策略：同域的 bank/ js/ css/ assets/ 走 "缓存优先，后台更新"（network fallback → 首次填缓存）
  */
-const CACHE = 'st-bank-v1';
+const CACHE = 'st-bank-v2';
 
 self.addEventListener('install', function (e) {
   self.skipWaiting();
