@@ -1075,5 +1075,14 @@
       </div>
     </div>
   </div>
+
+  <!-- Service Worker：首次加载题库后本地缓存，之后打开秒开 -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').catch(function (e) { console.warn('SW 注册失败:', e); });
+      });
+    }
+  </script>
 </body>
 </html>

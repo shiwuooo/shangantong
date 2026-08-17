@@ -1,23 +1,21 @@
-/* 上岸通 · 真题库(bank/)加载器
- * 职责：
- *   1. 提供 window.registerBankPaper(paper) 给 bank/*.js 调用
- *   2. 按 bank/manifest.js 里的 BANK_FILES 列表同步加载所有分卷文件
- * bank 文件格式见 bank/_README.md
+/* 上岸通 · 真题库(bank/)加载器 v2
+ * 改进：
+ *   1. 字节级进度（不再"一个大文件下载中却显示卡住"）
+ *   2. 并发受限(MAX_PARALLEL)，避免平板一次性发几十请求被限流挂起
+ *   3. 用 fetch + eval 执行，配合 sw.js 首次加载即缓存 → 之后秒开
+ * 职责：提供 window.registerBankPaper，按 manifest 加载所有分卷文件
  */
 (function () {
   'use strict';
 
   window.BANK_PAPERS = window.BANK_PAPERS || [];
-  // 去重哈希表：题 id -> 1（O(1) 判重，替代原先逐题扫描 QB 的 O(n²) 灾难）
   var _seen = Object.create(null);
 
-  // 从题目 id 尾部取原卷题号（如 xc-2024-gk-dishi-37 -> 37）
   function qNum(id) {
     var m = String(id || '').match(/-(\d+)$/);
     return m ? +m[1] : null;
   }
 
-  // 供 bank/*.js 调用
   window.registerBankPaper = function (paper) {
     if (!paper || !Array.isArray(paper.questions)) return;
     var _fq = paper.questions[0] || {};
@@ -28,29 +26,23 @@
       year: _fq.year ? Number(_fq.year) : '',
       examType: _fq.exam_type || '',
       volume: _fq.exam_volume || '行测',
-      // 模考卷无标准答案（answer=null），标记后由 App 走"盲练/计时"分支，不污染训练数据
       noAnswer: !!(paper.noAnswer || _fq.noAnswer)
     });
 
-    // 卷型结构表：真题的模块/题型由题号位置决定，这是硬标准，优先于源标签与内容推断
     var ST = (window.PAPER_STRUCTURE || {})[paper.id] || null;
     var needMat = {};
     if (ST && ST.needMaterial) ST.needMaterial.forEach(function (n) { needMat[n] = 1; });
 
     paper.questions.forEach(function (q, i) {
-      // 模考无答案：answer 允许为 null（带 noAnswer 标记），进入题库用于盲练/计时，不参与判分
       if (!q || !q.q || !Array.isArray(q.options)) return;
       if (typeof q.answer !== 'number' && !q.noAnswer) return;
       var id = q.id || (paper.id + '-' + (i + 1));
       var no = qNum(id);
 
-      // 模块：结构表按题号定位 > 源标签
       var mod = (ST && no != null && ST.modOf && ST.modOf[no]) || q.module;
       if (!mod || !window.QB[mod]) return;
-      // 题型：源标签 > 结构表按题号定位
       var topic = q.topic || (ST && no != null && ST.topicOf ? ST.topicOf[no] : '') || '';
 
-      // 去重：同 id 不重复入库（O(1) 哈希，避免逐题扫描 QB 的 O(n²) 灾难）
       if (_seen[id]) return;
       window.QB[mod].push({
         id: id,
@@ -60,7 +52,6 @@
         type: q.type || '单选',
         q: q.q,
         material: q.material || '',
-        // 材料缺失（资料分析图表 / 篇章阅读长文），当前无法完整作答
         lackMaterial: !q.material && !!needMat[no],
         options: q.options,
         answer: q.answer,
@@ -70,11 +61,9 @@
         exam_type: q.exam_type || '',
         exam_volume: q.exam_volume || '行测',
         topic: topic,
-        // 官方考点（字符串数组，如 ["经济建设"]）；仅部分省考卷带，缺失则留空由推断兜底
         keypoints: (q.keypoints && q.keypoints.length) ? q.keypoints : (typeof q.keypoints === 'string' ? [q.keypoints] : null),
         src: q.src || '真题·回忆版',
         url: q.url || '',
-        // 带图 HTML 字段：资料分析图表/图形推理/带图题干与选项图，经本地化后透传
         qHtml: q.qHtml || null,
         materialHtml: q.materialHtml || null,
         optionsHtml: q.optionsHtml || null,
@@ -82,12 +71,8 @@
       });
       _seen[id] = 1;
     });
-
   };
 
-  // ---------- 异步加载（消除 document.write 同步冻结） ----------
-  // bank 文件改为动态注入，浏览器可在各脚本执行间隙让出主线程，
-  // 首屏进度遮罩可见且可响应；window.shuffle 等就绪信号由 boot 在题库就绪后触发。
   window.BANK_READY = false;
   var _bankCbs = [];
   window.onBankReady = function (cb) {
@@ -111,10 +96,10 @@
     var ov = _blEl('bankLoading');
     if (ov) { ov.classList.add('done'); setTimeout(function () { ov.style.display = 'none'; }, 380); }
   }
+  function _fmtMB(b) { return (b / 1048576).toFixed(0) + 'MB'; }
 
   function _fireReady() {
     window.BANK_READY = true;
-    // 一次性统计总题量（替代原先每卷重复累加，省去百万级无效遍历）
     if (window.QB_STATS) {
       window.QB_STATS.total = Object.keys(window.QB).reduce(function (s, k) {
         return s + (window.QB[k] ? window.QB[k].length : 0);
@@ -131,25 +116,70 @@
     .concat(Array.isArray(window.MOCK_BANK_FILES) ? window.MOCK_BANK_FILES : [])
     .filter(function (f) { return /^[\w.\-]+\.js$/.test(f); });
 
-  if (files.length) {
-    var total = files.length, done = 0;
-    _setProgress(0);
-    _setSub('正在载入 ' + total + ' 个真题分卷');
-    function _tick() {
-      done++;
-      _setProgress(done / total);
-      _setSub('已载入 ' + done + ' / ' + total + ' 个真题分卷');
-      if (done >= total) _fireReady();
-    }
-    files.forEach(function (f) {
-      var s = document.createElement('script');
-      s.src = 'bank/' + f;
-      s.async = true;
-      s.onload = _tick;
-      s.onerror = function () { console.error('bank file load failed:', f); _tick(); };
-      document.head.appendChild(s);
-    });
-  } else {
-    _fireReady();
+  var MAX_PARALLEL = 6;          // 并发受限，避免被限流挂起
+  var totalBytes = 0, gotBytes = 0;
+
+  function loadOne(f) {
+    return fetch('bank/' + f, { cache: 'force-cache' })
+      .then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + f);
+        var len = +res.headers.get('content-length') || 0;
+        totalBytes += len;
+        if (res.body && res.body.getReader) {
+          var reader = res.body.getReader();
+          var parts = [];
+          return new Promise(function (resolve, reject) {
+            function pump() {
+              reader.read().then(function (r) {
+                if (r.done) { resolve(parts); return; }
+                parts.push(r.value);
+                gotBytes += r.value.byteLength;
+                _setProgress(totalBytes ? gotBytes / totalBytes : 0);
+                pump();
+              }).catch(reject);
+            }
+            pump();
+          }).then(function (parts) {
+            var buf = new Uint8Array(gotBytes);
+            var off = 0;
+            parts.forEach(function (p) { buf.set(p, off); off += p.byteLength; });
+            return new TextDecoder('utf-8').decode(buf);
+          });
+        }
+        return res.text().then(function (t) {
+          gotBytes += len; _setProgress(totalBytes ? gotBytes / totalBytes : 0); return t;
+        });
+      })
+      .then(function (code) {
+        try { (0, eval)(code); } catch (e) { console.error('eval bank file failed:', f, e); }
+      });
   }
+
+  function run() {
+    if (!files.length) { _fireReady(); return; }
+    _setProgress(0);
+    _setSub('正在载入题库 ' + files.length + ' 个分卷（请稍候，进度按大小显示）');
+    var idx = 0, done = 0;
+    function next() {
+      if (idx >= files.length) return;
+      var f = files[idx++];
+      loadOne(f)
+        .then(function () {
+          done++;
+          _setSub('已载入 ' + done + ' / ' + files.length + ' 分卷  ·  ' + _fmtMB(gotBytes) + ' / ' + _fmtMB(totalBytes));
+          if (done >= files.length) _fireReady();
+          else next();
+        })
+        .catch(function (err) {
+          console.error(err);
+          done++;
+          _setSub('分卷 ' + f + ' 加载失败，已跳过(' + done + '/' + files.length + ')');
+          if (done >= files.length) _fireReady();
+          else next();
+        });
+    }
+    for (var i = 0; i < Math.min(MAX_PARALLEL, files.length); i++) next();
+  }
+
+  run();
 })();
