@@ -77,6 +77,8 @@
     // 每节点题集（Set<q>）
     Object.keys(window.QB || {}).forEach(function (mod) {
       (window.QB[mod] || []).forEach(function (q) {
+        // 专项练习只使用真题，排除模考/模拟题
+        if (q && q.isMock) return;
         const kps = Array.isArray(q.keypoints) ? q.keypoints : null;
         if (!kps || !kps.length) return;
         const touched = {};

@@ -1596,6 +1596,13 @@
   function renderPapers(params) {
     params = params || {};
     setPapersMode(params.mode === 'exam' ? 'exam' : 'papers');
+    // 套卷页允许真题+模考混合展示；后台静默加载模考卷，加载完自动刷新列表
+    if (params.mode !== 'exam' && window.loadMockBank && !window.MOCK_BANK_READY) {
+      window.loadMockBank(function () {
+        buildPaperFilters();
+        renderPaperList();
+      });
+    }
   }
 
   function buildPaperFilters() {

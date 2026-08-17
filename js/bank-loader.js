@@ -26,12 +26,16 @@
       year: _fq.year ? Number(_fq.year) : '',
       examType: _fq.exam_type || '',
       volume: _fq.exam_volume || '行测',
-      noAnswer: !!(paper.noAnswer || _fq.noAnswer)
+      noAnswer: !!(paper.noAnswer || _fq.noAnswer),
+      isMock: isMock
     });
 
     var ST = (window.PAPER_STRUCTURE || {})[paper.id] || null;
     var needMat = {};
     if (ST && ST.needMaterial) ST.needMaterial.forEach(function (n) { needMat[n] = 1; });
+
+    // 模考卷题目做标记，防止混入专项练习
+    var isMock = !!window._LOADING_MOCK_BANK;
 
     paper.questions.forEach(function (q, i) {
       if (!q || !q.q || !Array.isArray(q.options)) return;
@@ -62,8 +66,9 @@
         exam_volume: q.exam_volume || '行测',
         topic: topic,
         keypoints: (q.keypoints && q.keypoints.length) ? q.keypoints : (typeof q.keypoints === 'string' ? [q.keypoints] : null),
-        src: q.src || '真题·回忆版',
+        src: isMock ? '粉笔模考' : (q.src || '真题·回忆版'),
         url: q.url || '',
+        isMock: isMock,
         qHtml: q.qHtml || null,
         materialHtml: q.materialHtml || null,
         optionsHtml: q.optionsHtml || null,
@@ -112,12 +117,14 @@
     cbs.forEach(function (cb) { try { cb(); } catch (e) { console.error(e); } });
   }
 
+  // 首屏只加载真题库；模考卷由模考栏目按需加载，避免污染专项练习且减少首屏体积
   var files = (Array.isArray(window.BANK_FILES) ? window.BANK_FILES : [])
-    .concat(Array.isArray(window.MOCK_BANK_FILES) ? window.MOCK_BANK_FILES : [])
     .filter(function (f) { return /^[\w.\-]+\.js$/.test(f); });
 
   var MAX_PARALLEL = 6;          // 并发受限，避免被限流挂起
   var totalBytes = 0, gotBytes = 0;
+  var _mockCbs = [];
+  window.MOCK_BANK_READY = false;
 
   function loadOne(f) {
     return fetch('bank/' + f, { cache: 'force-cache' })
@@ -180,6 +187,57 @@
     }
     for (var i = 0; i < Math.min(MAX_PARALLEL, files.length); i++) next();
   }
+
+  // 按需加载模考卷；只在「模考」栏目进入时执行，避免污染专项练习的 QB
+  window.loadMockBank = function (callback) {
+    if (window.MOCK_BANK_READY) { if (callback) callback(); return; }
+    if (callback) _mockCbs.push(callback);
+    if (window._LOADING_MOCK_BANK) return;
+    window._LOADING_MOCK_BANK = true;
+
+    var mockFiles = (Array.isArray(window.MOCK_BANK_FILES) ? window.MOCK_BANK_FILES : [])
+      .filter(function (f) { return /^[\w.\-]+\.js$/.test(f); });
+    if (!mockFiles.length) {
+      window.MOCK_BANK_READY = true;
+      window._LOADING_MOCK_BANK = false;
+      _mockCbs.forEach(function (cb) { try { cb(); } catch (e) { console.error(e); } });
+      _mockCbs = [];
+      return;
+    }
+
+    var loaded = 0;
+    function mockNext() {
+      if (loaded >= mockFiles.length) return;
+      var f = mockFiles[loaded++];
+      fetch('bank/' + f, { cache: 'force-cache' })
+        .then(function (res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.text(); })
+        .then(function (code) {
+          window._LOADING_MOCK_BANK = true;
+          try { (0, eval)(code); } catch (e) { console.error('eval mock file failed:', f, e); }
+          if (loaded >= mockFiles.length) {
+            window.MOCK_BANK_READY = true;
+            window._LOADING_MOCK_BANK = false;
+            _mockCbs.forEach(function (cb) { try { cb(); } catch (e) { console.error(e); } });
+            _mockCbs = [];
+          } else {
+            mockNext();
+          }
+        })
+        .catch(function (err) {
+          console.error(err);
+          if (loaded >= mockFiles.length) {
+            window.MOCK_BANK_READY = true;
+            window._LOADING_MOCK_BANK = false;
+            _mockCbs.forEach(function (cb) { try { cb(); } catch (e) { console.error(e); } });
+            _mockCbs = [];
+          } else {
+            mockNext();
+          }
+        });
+    }
+    // 模考卷也做有限并发（3 个），避免移动网络/平板被压垮
+    for (var k = 0; k < Math.min(3, mockFiles.length); k++) mockNext();
+  };
 
   run();
 })();

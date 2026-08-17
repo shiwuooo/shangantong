@@ -25,9 +25,10 @@
     { key: 'dishi', label: '地市级' }
   ];
 
-  // 收集国考行测整卷（排除申论 / 真题汇编小题集）
+  // 只收集粉笔模考卷（真题卷在「套卷」模块展示，避免这里混排）
   function collect() {
     return (window.BANK_PAPERS || []).filter(function (p) {
+      if (!p.isMock) return false;
       if (p.volume !== '行测') return false;
       var et = p.examType || '';
       var isGk = /^gk-/.test(et) || (p.name || '').indexOf('国考') >= 0;
@@ -57,6 +58,16 @@
   window.renderMock = function () {
     var root = document.getElementById('mockRoot');
     if (!root) return;
+
+    // 模考卷按需加载；未加载完成前显示占位
+    if (!window.MOCK_BANK_READY) {
+      root.innerHTML = '<div class="mk-empty">正在加载模考卷…</div>';
+      if (window.loadMockBank) {
+        window.loadMockBank(function () { window.renderMock(); });
+      }
+      return;
+    }
+
     var papers = collect();
 
     // 卷型 → 年份 → [paper]
