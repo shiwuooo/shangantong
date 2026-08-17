@@ -1,11 +1,9 @@
-/* 上岸通 · 真题库(bank/)加载器 v3
- * v3 改进：
- *   1. 图片路径修正：题面 HTML 里的 assets/ 统一改写为 bank/assets/（一次性修复
- *      专项/套卷/模考/错题等所有用到题面 HTML 的图片显示问题）。
- *   2. 进度真实化：按"已载入分卷数 / 总分卷数"显示，不再因流式读取误报 100%。
- *   3. 去掉 ReadableStream 流式读取（三星等浏览器兼容性差、易卡死），改用 res.text()。
- *   4. 首屏只加载真题库(已合并为少量 bundle)；模考卷由模考栏目按需加载，避免污染专项练习。
- * 职责：提供 window.registerBankPaper，按 manifest 加载分卷文件。
+/* 上岸通 · 真题库(bank/)加载器 v2
+ * 改进：
+ *   1. 字节级进度（不再"一个大文件下载中却显示卡住"）
+ *   2. 并发受限(MAX_PARALLEL)，避免平板一次性发几十请求被限流挂起
+ *   3. 用 fetch + eval 执行，配合 sw.js 首次加载即缓存 → 之后秒开
+ * 职责：提供 window.registerBankPaper，按 manifest 加载所有分卷文件
  */
 (function () {
   'use strict';
@@ -16,14 +14,6 @@
   function qNum(id) {
     var m = String(id || '').match(/-(\d+)$/);
     return m ? +m[1] : null;
-  }
-
-  // 把题面 HTML 里的图片相对路径 assets/ 修正为 bank/assets/（图片真实位于 bank/assets/）
-  function fixAsset(s) {
-    if (typeof s !== 'string') return s;
-    return s
-      .replace(/(src\s*=\s*["'])assets\//gi, '$1bank/assets/')
-      .replace(/(url\(\s*["']?)assets\//gi, '$1bank/assets/');
   }
 
   window.registerBankPaper = function (paper) {
@@ -79,10 +69,10 @@
         src: isMock ? '粉笔模考' : (q.src || '真题·回忆版'),
         url: q.url || '',
         isMock: isMock,
-        qHtml: q.qHtml ? fixAsset(q.qHtml) : null,
-        materialHtml: q.materialHtml ? fixAsset(q.materialHtml) : null,
-        optionsHtml: q.optionsHtml ? fixAsset(q.optionsHtml) : null,
-        explainHtml: q.explainHtml ? fixAsset(q.explainHtml) : null
+        qHtml: q.qHtml || null,
+        materialHtml: q.materialHtml || null,
+        optionsHtml: q.optionsHtml || null,
+        explainHtml: q.explainHtml || null
       });
       _seen[id] = 1;
     });
@@ -111,6 +101,7 @@
     var ov = _blEl('bankLoading');
     if (ov) { ov.classList.add('done'); setTimeout(function () { ov.style.display = 'none'; }, 380); }
   }
+  function _fmtMB(b) { return (b / 1048576).toFixed(0) + 'MB'; }
 
   function _fireReady() {
     window.BANK_READY = true;
@@ -126,51 +117,55 @@
     cbs.forEach(function (cb) { try { cb(); } catch (e) { console.error(e); } });
   }
 
-  // 首屏只加载真题库(已合并为少量 bundle)；模考卷由模考栏目按需加载
+  // 首屏只加载真题库；模考卷由模考栏目按需加载，避免污染专项练习且减少首屏体积
   var files = (Array.isArray(window.BANK_FILES) ? window.BANK_FILES : [])
     .filter(function (f) { return /^[\w.\-]+\.js$/.test(f); });
 
-  var MOCK_BANK_FILES_FROM_MANIFEST = (Array.isArray(window.MOCK_BANK_FILES) ? window.MOCK_BANK_FILES : []);
-
-  var MAX_PARALLEL = 6;          // 并发受限，避免平板一次性发几十请求被限流挂起
+  var MAX_PARALLEL = 6;          // 并发受限，避免被限流挂起
+  var totalBytes = 0, gotBytes = 0;
   var _mockCbs = [];
   window.MOCK_BANK_READY = false;
 
-  // fetch 带超时（平板弱网下个别请求会无限挂起，必须超时才能继续）
-  function fetchWithTimeout(url, ms) {
-    if (typeof AbortController === 'function') {
-      var ctrl = new AbortController();
-      var t = setTimeout(function () { try { ctrl.abort(); } catch (e) {} }, ms);
-      return fetch(url, { signal: ctrl.signal }).then(function (r) {
-        clearTimeout(t); return r;
-      }, function (err) { clearTimeout(t); throw err; });
-    }
-    return fetch(url); // 极旧内核兜底：不超时
-  }
-
-  // 单个分卷：下载全文(res.text)→eval 注册；超时/失败自动重试，绝不永久卡死
-  function loadOne(f, attempt) {
-    attempt = attempt || 0;
-    var TIMEOUT = 20000, MAX_ATTEMPTS = 3;
-    return fetchWithTimeout('bank/' + f, TIMEOUT)
+  function loadOne(f) {
+    return fetch('bank/' + f, { cache: 'force-cache' })
       .then(function (res) {
         if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + f);
-        return res.text();
+        var len = +res.headers.get('content-length') || 0;
+        totalBytes += len;
+        if (res.body && res.body.getReader) {
+          var reader = res.body.getReader();
+          var parts = [];
+          return new Promise(function (resolve, reject) {
+            function pump() {
+              reader.read().then(function (r) {
+                if (r.done) { resolve(parts); return; }
+                parts.push(r.value);
+                gotBytes += r.value.byteLength;
+                _setProgress(totalBytes ? gotBytes / totalBytes : 0);
+                pump();
+              }).catch(reject);
+            }
+            pump();
+          }).then(function (parts) {
+            var buf = new Uint8Array(gotBytes);
+            var off = 0;
+            parts.forEach(function (p) { buf.set(p, off); off += p.byteLength; });
+            return new TextDecoder('utf-8').decode(buf);
+          });
+        }
+        return res.text().then(function (t) {
+          gotBytes += len; _setProgress(totalBytes ? gotBytes / totalBytes : 0); return t;
+        });
       })
       .then(function (code) {
         try { (0, eval)(code); } catch (e) { console.error('eval bank file failed:', f, e); }
-      })
-      .catch(function (err) {
-        if (attempt < MAX_ATTEMPTS - 1) return loadOne(f, attempt + 1); // 重试同一文件
-        console.error('分卷最终失败(已跳过):', f, err && err.message);
-        throw err; // 彻底放弃，调用方继续下一个，避免整队卡死
       });
   }
 
   function run() {
     if (!files.length) { _fireReady(); return; }
     _setProgress(0);
-    _setSub('正在载入题库 ' + files.length + ' 个分卷（请稍候）');
+    _setSub('正在载入题库 ' + files.length + ' 个分卷（请稍候，进度按大小显示）');
     var idx = 0, done = 0;
     function next() {
       if (idx >= files.length) return;
@@ -178,8 +173,7 @@
       loadOne(f)
         .then(function () {
           done++;
-          _setProgress(done / files.length);
-          _setSub('已载入 ' + done + ' / ' + files.length + ' 分卷');
+          _setSub('已载入 ' + done + ' / ' + files.length + ' 分卷  ·  ' + _fmtMB(gotBytes) + ' / ' + _fmtMB(totalBytes));
           if (done >= files.length) _fireReady();
           else next();
         })
@@ -201,7 +195,7 @@
     if (window._LOADING_MOCK_BANK) return;
     window._LOADING_MOCK_BANK = true;
 
-    var mockFiles = MOCK_BANK_FILES_FROM_MANIFEST
+    var mockFiles = (Array.isArray(window.MOCK_BANK_FILES) ? window.MOCK_BANK_FILES : [])
       .filter(function (f) { return /^[\w.\-]+\.js$/.test(f); });
     if (!mockFiles.length) {
       window.MOCK_BANK_READY = true;
@@ -215,7 +209,7 @@
     function mockNext() {
       if (loaded >= mockFiles.length) return;
       var f = mockFiles[loaded++];
-      fetchWithTimeout('bank/' + f, 20000)
+      fetch('bank/' + f, { cache: 'force-cache' })
         .then(function (res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.text(); })
         .then(function (code) {
           window._LOADING_MOCK_BANK = true;
