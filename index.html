@@ -1030,14 +1030,14 @@
   <script src="js/coach-ui.js"></script>
   <script src="js/custom-practice.js"></script>
   <script src="js/app.js"></script>
-  <!-- PWA：注册 Service Worker（仅 http/https，file:// 下跳过，避免报错） -->
+  <!-- 不再注册 Service Worker（其缓存逻辑在子目录下路径匹配失效，且易致弱网卡死）。此处主动注销任何已存在的旧 SW，清除旧缓存，改由浏览器原生 HTTP 缓存提速。 -->
   <script>
     (function () {
       try {
-        if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
-          window.addEventListener('load', function () {
-            navigator.serviceWorker.register('./sw.js').catch(function () {});
-          });
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function (regs) {
+            (regs || []).forEach(function (r) { r.unregister().catch(function () {}); });
+          }).catch(function () {});
         }
       } catch (e) {}
     })();
@@ -1076,13 +1076,5 @@
     </div>
   </div>
 
-  <!-- Service Worker：首次加载题库后本地缓存，之后打开秒开 -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function () {
-        navigator.serviceWorker.register('sw.js').catch(function (e) { console.warn('SW 注册失败:', e); });
-      });
-    }
-  </script>
 </body>
 </html>
